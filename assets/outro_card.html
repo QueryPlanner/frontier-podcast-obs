@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, height=1080, initial-scale=1">
+  <title>The Frontier Podcast - Outro Card</title>
+  <style>
+    :root {
+      --void: #05060d;
+      --deep: #0b1027;
+      --cyan: #35e0ff;
+      --gold: #ffd27a;
+      --paper: #f2f5ff;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      --condensed: "Arial Narrow", "Avenir Next Condensed", "Helvetica Neue", Arial, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      width: 1920px;
+      height: 1080px;
+      margin: 0;
+      overflow: hidden;
+      background: var(--void);
+    }
+
+    body {
+      color: var(--paper);
+      font-family: var(--sans);
+      text-transform: uppercase;
+    }
+
+    .canvas {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse at 50% 48%, rgba(17, 33, 70, 0.76) 0%, rgba(5, 6, 13, 0.93) 62%, var(--void) 100%),
+        var(--void);
+    }
+
+    .nebula {
+      position: absolute;
+      pointer-events: none;
+      filter: blur(36px);
+      opacity: 0.32;
+    }
+
+    .nebula-a {
+      top: 40px;
+      left: -240px;
+      width: 900px;
+      height: 560px;
+      background: radial-gradient(ellipse, rgba(33, 110, 164, 0.25), rgba(17, 42, 94, 0.08) 56%, transparent 77%);
+      transform: rotate(-13deg);
+    }
+
+    .nebula-b {
+      right: -230px;
+      bottom: 30px;
+      width: 920px;
+      height: 560px;
+      background: radial-gradient(ellipse, rgba(79, 35, 119, 0.22), rgba(45, 23, 78, 0.07) 56%, transparent 77%);
+      transform: rotate(17deg);
+    }
+
+    .stars {
+      position: absolute;
+      top: -120px;
+      left: -120px;
+      width: 2160px;
+      height: 1320px;
+      pointer-events: none;
+      background-repeat: no-repeat;
+      transform: translate3d(0, 0, 0);
+    }
+
+    .stars-far {
+      opacity: 0.4;
+      background-image:
+        radial-gradient(circle at 4% 12%, rgba(242, 245, 255, 0.65) 0 1px, transparent 1.8px),
+        radial-gradient(circle at 13% 62%, rgba(242, 245, 255, 0.5) 0 1px, transparent 1.8px),
+        radial-gradient(circle at 22% 27%, rgba(53, 224, 255, 0.44) 0 1px, transparent 1.8px),
+        radial-gradient(circle at 31% 82%, rgba(242, 245, 255, 0.58) 0 1px, transparent 1.8px),
+        radial-gradient(circle at 42% 17%, rgba(242, 245, 255, 0.55) 0 1px, transparent 1.8px),
+        radial-gradient(circle at 52% 72%, rgba(255, 210, 122, 0.44) 0 1px, transparent 1.8px),
+        radial-gradient(circle at 62% 8%, rgba(242, 245, 255, 0.64) 0 1px, transparent 1.8px),
+        radial-gradient(circle at 73% 63%, rgba(242, 245, 255, 0.54) 0 1px, transparent 1.8px),
+        radial-gradient(circle at 83% 31%, rgba(53, 224, 255, 0.42) 0 1px, transparent 1.8px),
+        radial-gradient(circle at 94% 78%, rgba(242, 245, 255, 0.6) 0 1px, transparent 1.8px);
+      animation: outro-far-drift 58s ease-in-out infinite alternate;
+    }
+
+    .stars-mid {
+      opacity: 0.58;
+      background-image:
+        radial-gradient(circle at 8% 38%, rgba(242, 245, 255, 0.82) 0 1.3px, transparent 2.6px),
+        radial-gradient(circle at 19% 86%, rgba(53, 224, 255, 0.62) 0 1.2px, transparent 2.5px),
+        radial-gradient(circle at 29% 18%, rgba(242, 245, 255, 0.72) 0 1.2px, transparent 2.5px),
+        radial-gradient(circle at 41% 57%, rgba(255, 210, 122, 0.62) 0 1.2px, transparent 2.5px),
+        radial-gradient(circle at 53% 9%, rgba(242, 245, 255, 0.78) 0 1.3px, transparent 2.6px),
+        radial-gradient(circle at 65% 76%, rgba(53, 224, 255, 0.63) 0 1.2px, transparent 2.5px),
+        radial-gradient(circle at 77% 29%, rgba(242, 245, 255, 0.72) 0 1.2px, transparent 2.5px),
+        radial-gradient(circle at 89% 88%, rgba(242, 245, 255, 0.66) 0 1.2px, transparent 2.5px);
+      animation: outro-mid-drift 43s ease-in-out infinite alternate;
+    }
+
+    .vignette {
+      position: absolute;
+      z-index: 6;
+      top: 0;
+      left: 0;
+      width: 1920px;
+      height: 1080px;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 26%, rgba(5, 6, 13, 0.18) 59%, rgba(5, 6, 13, 0.93) 100%);
+    }
+
+    .warp-svg {
+      position: absolute;
+      z-index: 3;
+      top: 0;
+      left: 0;
+      width: 1920px;
+      height: 1080px;
+      pointer-events: none;
+    }
+
+    .warp-rays {
+      fill: none;
+      stroke: rgba(53, 224, 255, 0.2);
+      stroke-width: 1;
+    }
+
+    .warp-ray-bright {
+      stroke: rgba(53, 224, 255, 0.42);
+      stroke-width: 2;
+    }
+
+    .warp-ring {
+      fill: none;
+      stroke: rgba(255, 210, 122, 0.42);
+      stroke-dasharray: 2 13;
+      stroke-width: 2;
+    }
+
+    .warp-stars {
+      transform-box: fill-box;
+      transform-origin: 50% 43.5%;
+      animation: recede 18s ease-in-out infinite alternate;
+    }
+
+    .warp-stars circle:nth-child(3n) { fill: var(--gold); }
+    .warp-stars circle:nth-child(3n + 1) { fill: var(--cyan); }
+    .warp-stars circle:nth-child(3n + 2) { fill: var(--paper); }
+
+    .outro-lockup {
+      position: absolute;
+      z-index: 8;
+      top: 250px;
+      left: 300px;
+      width: 1320px;
+      text-align: center;
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+      animation: outro-entrance 1.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .eyebrow {
+      color: var(--cyan);
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.34em;
+    }
+
+    .outro-title {
+      margin: 24px 0 0;
+      color: var(--paper);
+      font-family: var(--condensed);
+      font-size: 112px;
+      font-weight: 950;
+      letter-spacing: -0.075em;
+      line-height: 0.84;
+    }
+
+    #thanks-accent { color: var(--cyan); }
+
+    .sponsor-grid {
+      width: 1040px;
+      height: 84px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      margin: 70px auto 0;
+      border-top: 1px solid rgba(53, 224, 255, 0.5);
+      border-bottom: 1px solid rgba(53, 224, 255, 0.5);
+    }
+
+    .sponsor {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      border-right: 1px solid rgba(242, 245, 255, 0.18);
+      color: var(--paper);
+      font-family: var(--condensed);
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      white-space: nowrap;
+    }
+
+    .sponsor:last-child { border-right: 0; }
+    .sponsor-glyph { color: var(--gold); font-size: 16px; }
+
+    .footer {
+      position: absolute;
+      z-index: 8;
+      right: 44px;
+      bottom: 40px;
+      left: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: rgba(242, 245, 255, 0.52);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+    }
+
+    .footer .accent { color: var(--gold); }
+
+    @keyframes recede {
+      from { opacity: 0.82; transform: scale(1); }
+      to { opacity: 0.26; transform: scale(0.72); }
+    }
+
+    @keyframes outro-entrance {
+      0% { opacity: 0; transform: translate3d(0, 28px, 0); }
+      100% { opacity: 1; transform: translate3d(0, 0, 0); }
+    }
+
+    @keyframes outro-far-drift {
+      from { transform: translate3d(-16px, 8px, 0); }
+      to { transform: translate3d(16px, -8px, 0); }
+    }
+
+    @keyframes outro-mid-drift {
+      from { transform: translate3d(23px, -13px, 0); }
+      to { transform: translate3d(-23px, 13px, 0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .stars,
+      .warp-stars,
+      .outro-lockup { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="nebula nebula-a"></div>
+    <div class="nebula nebula-b"></div>
+    <div class="stars stars-far" data-animate></div>
+    <div class="stars stars-mid" data-animate></div>
+
+    <svg class="warp-svg" viewBox="0 0 1920 1080" aria-hidden="true">
+      <g class="warp-rays">
+        <line x1="0" y1="0" x2="960" y2="470"></line>
+        <line x1="320" y1="0" x2="960" y2="470"></line>
+        <line x1="720" y1="0" x2="960" y2="470"></line>
+        <line x1="1200" y1="0" x2="960" y2="470"></line>
+        <line x1="1600" y1="0" x2="960" y2="470"></line>
+        <line x1="1920" y1="0" x2="960" y2="470"></line>
+        <line x1="0" y1="1080" x2="960" y2="470"></line>
+        <line x1="320" y1="1080" x2="960" y2="470"></line>
+        <line x1="720" y1="1080" x2="960" y2="470"></line>
+        <line x1="1200" y1="1080" x2="960" y2="470"></line>
+        <line x1="1600" y1="1080" x2="960" y2="470"></line>
+        <line x1="1920" y1="1080" x2="960" y2="470"></line>
+        <line x1="0" y1="240" x2="960" y2="470"></line>
+        <line x1="0" y1="760" x2="960" y2="470"></line>
+        <line x1="1920" y1="240" x2="960" y2="470"></line>
+        <line x1="1920" y1="760" x2="960" y2="470"></line>
+      </g>
+      <g class="warp-rays">
+        <line class="warp-ray-bright" x1="0" y1="1080" x2="960" y2="470"></line>
+        <line class="warp-ray-bright" x1="1920" y1="1080" x2="960" y2="470"></line>
+        <line class="warp-ray-bright" x1="0" y1="0" x2="960" y2="470"></line>
+        <line class="warp-ray-bright" x1="1920" y1="0" x2="960" y2="470"></line>
+      </g>
+      <ellipse class="warp-ring" cx="960" cy="470" rx="145" ry="40"></ellipse>
+      <ellipse class="warp-ring" cx="960" cy="470" rx="300" ry="82" opacity="0.35"></ellipse>
+      <g class="warp-stars" data-animate>
+        <circle cx="260" cy="170" r="2.4"></circle><circle cx="515" cy="120" r="1.6"></circle>
+        <circle cx="820" cy="180" r="2.1"></circle><circle cx="1090" cy="126" r="1.7"></circle>
+        <circle cx="1420" cy="210" r="2.4"></circle><circle cx="1700" cy="126" r="1.5"></circle>
+        <circle cx="170" cy="430" r="1.6"></circle><circle cx="400" cy="370" r="2.2"></circle>
+        <circle cx="670" cy="410" r="1.5"></circle><circle cx="1250" cy="392" r="2.2"></circle>
+        <circle cx="1510" cy="360" r="1.7"></circle><circle cx="1770" cy="450" r="2.2"></circle>
+        <circle cx="180" cy="760" r="2.3"></circle><circle cx="430" cy="870" r="1.6"></circle>
+        <circle cx="710" cy="690" r="2.1"></circle><circle cx="1250" cy="720" r="1.5"></circle>
+        <circle cx="1510" cy="850" r="2.4"></circle><circle cx="1770" cy="720" r="1.7"></circle>
+        <circle cx="620" cy="1010" r="1.6"></circle><circle cx="1030" cy="990" r="2.1"></circle>
+        <circle cx="1370" cy="1030" r="1.7"></circle>
+      </g>
+    </svg>
+
+    <div class="outro-lockup" data-animate>
+      <div class="eyebrow" id="eyebrow">TRANSMISSION COMPLETE</div>
+      <h1 class="outro-title" id="thanks"><span id="thanks-main">THANKS</span> <span id="thanks-accent">FOR LISTENING</span></h1>
+      <div class="sponsor-grid">
+        <div class="sponsor"><span class="sponsor-glyph">✦</span><span data-sponsor="0">lordpatil.com</span></div>
+        <div class="sponsor"><span class="sponsor-glyph">◆</span><span data-sponsor="1">Dev Drink</span></div>
+        <div class="sponsor"><span class="sponsor-glyph">✧</span><span data-sponsor="2">Lord Socks</span></div>
+        <div class="sponsor"><span class="sponsor-glyph">✦</span><span data-sponsor="3">House of Lords</span></div>
+      </div>
+    </div>
+
+    <div class="vignette"></div>
+    <div class="footer">
+      <span id="footer-left">THE FRONTIER PODCAST // KEEP LOOKING OUTWARD</span>
+      <span class="accent" id="footer-right">LORDPATIL.COM</span>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const defaults = ["lordpatil.com", "Dev Drink", "Lord Socks", "House of Lords"];
+
+    function readText(name, fallback, limit = 160) {
+      const value = params.get(name);
+      if (!value || !value.trim()) return fallback;
+      return value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, limit);
+    }
+
+    function readSponsors() {
+      const raw = params.get("sponsors");
+      if (!raw) return defaults;
+      const values = raw.split("|").map((item) => item.trim()).filter(Boolean).slice(0, 4);
+      return defaults.map((fallback, index) => values[index] || fallback);
+    }
+
+    const sponsors = readSponsors();
+    document.querySelectorAll("[data-sponsor]").forEach((element) => {
+      element.textContent = sponsors[Number(element.dataset.sponsor)] || "";
+    });
+    const thanks = readText("thanks", "THANKS FOR LISTENING", 80).split(" ");
+    const thanksAccent = thanks.length > 1 ? thanks.splice(1).join(" ") : "";
+    document.getElementById("thanks-main").textContent = thanks.join(" ");
+    document.getElementById("thanks-accent").textContent = thanksAccent;
+    document.getElementById("eyebrow").textContent = readText("eyebrow", "TRANSMISSION COMPLETE", 100);
+    const presentedBy = readText("presentedBy", sponsors[0], 80);
+    document.getElementById("footer-right").textContent = presentedBy;
+    document.getElementById("footer-left").textContent = `${readText("show", "THE FRONTIER PODCAST", 80)} // KEEP LOOKING OUTWARD`;
+
+    // Debug-only: freeze animations at t seconds for deterministic screenshots.
+    // Must test presence explicitly -- params.get() returns null when absent and
+    // Number(null) is 0, which is finite and >= 0, so a bare Number() check
+    // freezes every animation at time zero in normal playback.
+    const freezeRaw = params.get("t");
+    const freezeAt = Number(freezeRaw);
+    if (freezeRaw !== null && freezeRaw.trim() !== "" &&
+        Number.isFinite(freezeAt) && freezeAt >= 0) {
+      window.requestAnimationFrame(() => {
+        document.querySelectorAll("[data-animate]").forEach((element) => {
+          element.getAnimations().forEach((animation) => {
+            animation.pause();
+            animation.currentTime = freezeAt * 1000;
+          });
+        });
+      });
+    }
+  </script>
+</body>
+</html>

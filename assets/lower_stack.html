@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, height=340, initial-scale=1">
+  <title>The Frontier Podcast - Lower Stack</title>
+  <style>
+    :root {
+      --void: #05060d;
+      --deep: #0b1027;
+      --cyan: #35e0ff;
+      --gold: #ffd27a;
+      --paper: #f2f5ff;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      --condensed: "Arial Narrow", "Avenir Next Condensed", "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      width: 1920px;
+      height: 340px;
+      margin: 0;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    body {
+      color: var(--paper);
+      font-family: var(--sans);
+      text-transform: uppercase;
+    }
+
+    .canvas {
+      position: relative;
+      width: 1920px;
+      height: 340px;
+      overflow: hidden;
+    }
+
+    .stack {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1920px;
+      height: 340px;
+      display: grid;
+      grid-template-rows: 56px 130px 70px 84px;
+      gap: 0;
+    }
+
+    .row {
+      position: relative;
+      width: 1920px;
+      min-width: 1920px;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      border-bottom: 1px solid rgba(242, 245, 255, 0.14);
+    }
+
+    .row-a {
+      justify-content: center;
+      padding: 0 220px;
+      background: linear-gradient(90deg, rgba(11, 16, 39, 0.96), rgba(22, 76, 96, 0.96) 50%, rgba(11, 16, 39, 0.96));
+      border-top: 1px solid rgba(53, 224, 255, 0.62);
+      border-bottom-color: rgba(53, 224, 255, 0.4);
+    }
+
+    .row-a::before,
+    .row-a::after {
+      position: absolute;
+      width: 7px;
+      height: 7px;
+      background: var(--cyan);
+      content: "";
+    }
+
+    .row-a::before { top: 0; left: 0; }
+    .row-a::after { right: 0; bottom: 0; }
+
+    .hosts {
+      width: 100%;
+      overflow: hidden;
+      color: var(--paper);
+      font-family: var(--condensed);
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      line-height: 1;
+      text-align: center;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .row-b {
+      justify-content: center;
+      background: var(--paper);
+      color: var(--void);
+    }
+
+    .headline {
+      width: 100%;
+      padding: 0 60px;
+      overflow: hidden;
+      font-family: var(--condensed);
+      font-size: 76px;
+      font-stretch: condensed;
+      font-weight: 950;
+      letter-spacing: -0.065em;
+      line-height: 0.9;
+      text-align: center;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .row-c {
+      padding: 0 20px 0 218px;
+      background: rgba(11, 16, 39, 0.96);
+      border-bottom-color: rgba(53, 224, 255, 0.25);
+    }
+
+    .sponsor-grid {
+      width: 100%;
+      height: 70px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      align-items: center;
+    }
+
+    .sponsor {
+      min-width: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 0 16px;
+      color: var(--paper);
+      font-family: var(--condensed);
+      font-size: 16px;
+      font-weight: 900;
+      letter-spacing: 0.1em;
+      white-space: nowrap;
+    }
+
+    .sponsor-glyph {
+      color: var(--gold);
+      font-size: 17px;
+      line-height: 1;
+    }
+
+    .row-d {
+      background: rgba(5, 6, 13, 0.98);
+      border-bottom: 0;
+    }
+
+    /* Stop the track short of the presented-by chip (chip: 240px wide, 22px
+       from the right) so scrolling names are never hard-sliced by its edge,
+       and fade the last 90px so they dissolve out instead of popping. */
+    .ticker-window {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1634px;
+      height: 84px;
+      overflow: hidden;
+      -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 90px), transparent 100%);
+      mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 90px), transparent 100%);
+    }
+
+    .ticker-track {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 84px;
+      display: flex;
+      align-items: center;
+      width: max-content;
+      color: var(--paper);
+      font-family: var(--condensed);
+      font-size: 19px;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      white-space: nowrap;
+      will-change: transform;
+      animation: ticker-run 30s linear infinite;
+    }
+
+    .ticker-set {
+      height: 84px;
+      display: inline-flex;
+      align-items: center;
+      flex: 0 0 auto;
+      padding-right: 86px;
+    }
+
+    .ticker-name { display: inline-block; }
+
+    .ticker-separator {
+      display: inline-block;
+      margin: 0 32px;
+      color: var(--cyan);
+      font-size: 16px;
+    }
+
+    .ticker-chip {
+      position: absolute;
+      z-index: 4;
+      top: 14px;
+      right: 22px;
+      width: 240px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--cyan);
+      color: var(--void);
+      border-left: 4px solid var(--paper);
+      font-family: var(--condensed);
+      font-size: 18px;
+      font-weight: 950;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .badge {
+      position: absolute;
+      z-index: 8;
+      top: 22px;
+      left: 18px;
+      width: 178px;
+      height: 178px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding-top: 10px;
+      background: var(--void);
+      border: 2px solid var(--cyan);
+      box-shadow: 9px 9px 0 rgba(53, 224, 255, 0.18);
+    }
+
+    .badge::before,
+    .badge::after {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: var(--gold);
+      content: "";
+    }
+
+    .badge::before { top: -2px; left: -2px; }
+    .badge::after { right: -2px; bottom: -2px; }
+
+    .badge svg {
+      width: 132px;
+      height: 106px;
+      overflow: visible;
+    }
+
+    .badge-orbit {
+      transform-origin: 66px 53px;
+      animation: badge-orbit 18s linear infinite;
+    }
+
+    .badge-monogram {
+      fill: var(--paper);
+      font-family: var(--condensed);
+      font-size: 43px;
+      font-weight: 950;
+      letter-spacing: -0.08em;
+      text-anchor: middle;
+    }
+
+    .badge-label {
+      color: var(--cyan);
+      font-family: var(--condensed);
+      font-size: 14px;
+      font-weight: 950;
+      letter-spacing: 0.18em;
+      line-height: 1;
+    }
+
+    @keyframes ticker-run {
+      from { transform: translate3d(0, 0, 0); }
+      to { transform: translate3d(-50%, 0, 0); }
+    }
+
+    @keyframes badge-orbit {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .ticker-track,
+      .badge-orbit { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="stack">
+      <div class="row row-a">
+        <div class="hosts" id="hosts">CHIRAG PATIL @LORDPATIL  |  GUEST NAME @HANDLE</div>
+      </div>
+
+      <div class="row row-b">
+        <div class="headline" id="headline">THE FRONTIER</div>
+      </div>
+
+      <div class="row row-c">
+        <div class="sponsor-grid">
+          <div class="sponsor"><span class="sponsor-glyph">✦</span><span data-sponsor="0">lordpatil.com</span></div>
+          <div class="sponsor"><span class="sponsor-glyph">◆</span><span data-sponsor="1">Dev Drink</span></div>
+          <div class="sponsor"><span class="sponsor-glyph">✧</span><span data-sponsor="2">Lord Socks</span></div>
+          <div class="sponsor"><span class="sponsor-glyph">✦</span><span data-sponsor="3">House of Lords</span></div>
+        </div>
+      </div>
+
+      <div class="row row-d">
+        <div class="ticker-window" aria-label="Sponsor ticker">
+          <div class="ticker-track" data-animate>
+            <div class="ticker-set">
+              <span class="ticker-name" data-sponsor="0">lordpatil.com</span><span class="ticker-separator">✦</span>
+              <span class="ticker-name" data-sponsor="1">Dev Drink</span><span class="ticker-separator">✦</span>
+              <span class="ticker-name" data-sponsor="2">Lord Socks</span><span class="ticker-separator">✦</span>
+              <span class="ticker-name" data-sponsor="3">House of Lords</span><span class="ticker-separator">✦</span>
+            </div>
+            <div class="ticker-set" aria-hidden="true">
+              <span class="ticker-name" data-sponsor="0">lordpatil.com</span><span class="ticker-separator">✦</span>
+              <span class="ticker-name" data-sponsor="1">Dev Drink</span><span class="ticker-separator">✦</span>
+              <span class="ticker-name" data-sponsor="2">Lord Socks</span><span class="ticker-separator">✦</span>
+              <span class="ticker-name" data-sponsor="3">House of Lords</span><span class="ticker-separator">✦</span>
+            </div>
+          </div>
+        </div>
+        <div class="ticker-chip" id="ticker-chip">lordpatil.com</div>
+      </div>
+    </div>
+
+    <div class="badge" aria-label="The Frontier monogram">
+      <svg viewBox="0 0 132 106" role="img" aria-labelledby="badge-title">
+        <title id="badge-title">TF orbital monogram</title>
+        <g class="badge-orbit" data-animate fill="none" stroke-linecap="round">
+          <ellipse cx="66" cy="53" rx="54" ry="19" stroke="#35e0ff" stroke-width="1.4" transform="rotate(-17 66 53)"></ellipse>
+          <ellipse cx="66" cy="53" rx="43" ry="29" stroke="#ffd27a" stroke-width="1" stroke-dasharray="2 5" transform="rotate(61 66 53)"></ellipse>
+          <circle cx="113" cy="38" r="3" fill="#ffd27a" stroke="none"></circle>
+          <circle cx="28" cy="72" r="2" fill="#35e0ff" stroke="none"></circle>
+        </g>
+        <text class="badge-monogram" x="66" y="68">TF</text>
+      </svg>
+      <div class="badge-label">FRONTIER</div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const defaults = ["lordpatil.com", "Dev Drink", "Lord Socks", "House of Lords"];
+
+    function readText(name, fallback, limit = 180) {
+      const value = params.get(name);
+      if (!value || !value.trim()) return fallback;
+      return value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, limit);
+    }
+
+    function readSponsors() {
+      const raw = params.get("sponsors");
+      if (!raw) return defaults;
+      const values = raw.split("|").map((item) => item.trim()).filter(Boolean).slice(0, 4);
+      return defaults.map((fallback, index) => values[index] || fallback);
+    }
+
+    document.getElementById("hosts").textContent = readText(
+      "hosts",
+      "CHIRAG PATIL @LORDPATIL  |  GUEST NAME @HANDLE",
+      180
+    );
+    document.getElementById("headline").textContent = readText("title", "THE FRONTIER", 80);
+
+    const sponsors = readSponsors();
+    document.querySelectorAll("[data-sponsor]").forEach((element) => {
+      element.textContent = sponsors[Number(element.dataset.sponsor)] || "";
+    });
+    const presentedBy = readText("presentedBy", sponsors[0], 80);
+    document.getElementById("ticker-chip").textContent = presentedBy;
+
+    // Debug-only: freeze animations at t seconds for deterministic screenshots.
+    // Must test presence explicitly -- params.get() returns null when absent and
+    // Number(null) is 0, which is finite and >= 0, so a bare Number() check
+    // freezes every animation at time zero in normal playback.
+    const freezeRaw = params.get("t");
+    const freezeAt = Number(freezeRaw);
+    if (freezeRaw !== null && freezeRaw.trim() !== "" &&
+        Number.isFinite(freezeAt) && freezeAt >= 0) {
+      window.requestAnimationFrame(() => {
+        document.querySelectorAll("[data-animate]").forEach((element) => {
+          element.getAnimations().forEach((animation) => {
+            animation.pause();
+            animation.currentTime = freezeAt * 1000;
+          });
+        });
+      });
+    }
+  </script>
+</body>
+</html>

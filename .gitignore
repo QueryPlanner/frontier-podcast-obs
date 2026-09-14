@@ -1,0 +1,27 @@
+# Room credentials. A vdo.ninja room is unauthenticated -- anyone holding
+# these can walk into a live recording. Never commit them.
+.env
+.env.*
+!.env.example
+
+# Generated links. Each one embeds the room name and password in plaintext.
+guest_link.txt
+director_link.txt
+view_link.txt
+
+# The built scene collection. Contains the resolved room URLs, so it is a
+# secret artifact too -- regenerate it rather than sharing it.
+podcast_scenes.json
+
+# Intermediate render screenshots from asset development.
+render/
+
+# Recordings
+*.mov
+*.mp4
+*.mkv
+*.webm
+
+__pycache__/
+*.pyc
+.DS_Store
