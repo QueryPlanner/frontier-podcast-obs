@@ -4,8 +4,10 @@ The WTF mark, palette, orbital animation and planet renderer are based on the
 approved HTML brand board in the parent workspace.
 
 `bev-logo.svg` contains the supplied attachment artwork named
-`Brand Identity/SVG/Bev- type- white bg.svg`. It uses the original light badge
-and dark lettering. The logo remains artwork; it is not recreated with a font.
+`Brand Identity/SVG/Full logo.svg`. It preserves the original blue, red and
+yellow shapes followed by the dark Bev. wordmark. CSS supplies a bone-colored
+panel and clear space for contrast against the dark studio background.
+The SVG is unchanged from the attachment; it is not recreated with a font.
 
 The fonts were downloaded from the Google Fonts repository, with their
 original SIL Open Font License files alongside them:

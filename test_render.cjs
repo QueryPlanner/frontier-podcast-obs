@@ -60,6 +60,10 @@ test('brands share a strip separate from host identities and websites',async()=>
     const strip=page.locator('.brand-strip');
     assert.equal(await strip.count(),1);
     assert.equal(await strip.locator('img[alt="Bev."]').count(),1);
+    assert.ok(await strip.locator('img[alt="Bev."]').evaluate(e=>
+      e.complete && e.naturalWidth/e.naturalHeight>5.9 &&
+      getComputedStyle(e).objectFit==='contain' &&
+      getComputedStyle(e).backgroundColor==='rgb(242, 235, 221)'));
     assert.match(await strip.innerText(),/Lord Socks/);
     assert.match(await strip.innerText(),/House of Lords/);
     assert.doesNotMatch(await strip.innerText(),/Chirag|Parth|lordpatil|parthshastri/);
