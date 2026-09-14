@@ -113,4 +113,14 @@ test('all twelve scenes preview with the actual components and no remote connect
       await page.locator('.stage').screenshot({path:path.join(render,'scene-'+name.slice(0,2)+'.png')});
   }
 });
+test('local-host preview selector switches capture roles and preserves duo',async()=>{
+  await page.goto(pathToFileURL(path.join(render,'studio-preview.html')).href);
+  for(const host of ['parth','chirag']){
+    await page.locator('#local-host').selectOption(host);
+    assert.equal(await page.locator('#scene').inputValue(),'04 Duo');
+    assert.equal(await page.locator('.camera.'+host+' small').innerText(),'LOCAL CAMERA PREVIEW');
+    const remote=host==='chirag'?'parth':'chirag';
+    assert.equal(await page.locator('.camera.'+remote+' small').innerText(),'REMOTE CAMERA PREVIEW');
+  }
+});
 test('no browser runtime errors',()=>assert.deepEqual(errors,[]));

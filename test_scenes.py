@@ -740,6 +740,153 @@ class TestDuoStudio(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(bs.ASSETS, "fonts", family + "-OFL.txt")))
 
 
+class TestLocalHostSelection(unittest.TestCase):
+    def variants(self):
+        for host in ("chirag", "parth"):
+            yield host, build(ROOM, GUEST_ID, PASSWORD, parth_id=PARTH_ID,
+                              chirag_id="testchirag", local_host=host)
+
+    def test_collection_names_are_distinct_and_both_open_on_duo(self):
+        names = set()
+        for host, col in self.variants():
+            names.add(col["name"])
+            self.assertEqual(col["name"], f"WTF · {host.title()} local")
+            self.assertEqual(col["current_scene"], "04 Duo")
+            self.assertEqual(col["current_program_scene"], "04 Duo")
+        self.assertEqual(len(names), 2)
+
+    def test_only_selected_host_has_local_camera_and_microphone(self):
+        for host, col in self.variants():
+            local = host.title()
+            remote = "Parth" if host == "chirag" else "Chirag"
+            sources = sources_by_name(col)
+            self.assertEqual(sources[f"CAM · {local}"]["id"], "macos-avcapture")
+            self.assertEqual(sources[f"MIC · {local}"]["id"], "coreaudio_input_capture")
+            self.assertEqual(sources[f"CAM · {remote}"]["id"], "browser_source")
+            self.assertNotIn(f"MIC · {remote}", sources)
+            self.assertEqual(sum(s["id"] == "coreaudio_input_capture" for s in col["sources"]), 1)
+
+    def test_voice_tracks_stay_attached_to_people(self):
+        for host, col in self.variants():
+            sources = sources_by_name(col)
+            for person, bit in (("chirag", bs.TRACK_1), ("parth", bs.TRACK_4)):
+                source = f"MIC · {person.title()}" if host == person else f"CAM · {person.title()}"
+                self.assertEqual(sources[source]["mixers"], bit | bs.TRACK_6)
+            for index in range(5):
+                self.assertEqual(sum(bool(s["mixers"] & (1 << index)) for s in col["sources"]), 1)
+
+    def test_remote_host_uses_the_correct_stream_and_share(self):
+        for host, col in self.variants():
+            person, sid = ("Parth", PARTH_ID) if host == "chirag" else ("Chirag", "testchirag")
+            sources = sources_by_name(col)
+            for name, stream in ((f"CAM · {person}", sid), (f"SCREEN · {person} Share", sid + ":s")):
+                source = sources[name]
+                query = parse_qs(urlparse(source["settings"]["url"]).query)
+                self.assertEqual(query["view"], [stream])
+                self.assertEqual(query["password"], [PASSWORD])
+                self.assertFalse(source["settings"]["restart_when_active"])
+                self.assertFalse(source["settings"]["shutdown"])
+            self.assertEqual(sources[f"SCREEN · {person} Share"]["mixers"], bs.TRACK_5 | bs.TRACK_6)
+
+    def test_active_audio_carriers_follow_the_selected_local_host(self):
+        for host, col in self.variants():
+            local = host.title()
+            remote = "Parth" if host == "chirag" else "Chirag"
+            expected = {f"MIC · {local}", f"CAM · {remote}", f"SCREEN · {remote} Share",
+                        "CAM · Guest", "SCREEN · Guest Share"}
+            for scene in scenes(col):
+                items = scene["settings"]["items"]
+                backing = next(i for i, item in enumerate(items) if item["name"] == "BG · Void")
+                carriers = [item for item in items if item["private_settings"].get("frontier_role") == CARRIER]
+                self.assertEqual({item["name"] for item in carriers}, expected)
+                for item in carriers:
+                    self.assertTrue(item["visible"])
+                    self.assertLess(items.index(item), backing)
+
+    def test_content_slot_defaults_to_local_screen_and_offers_remote_host_share(self):
+        for host, col in self.variants():
+            remote = "Parth" if host == "chirag" else "Chirag"
+            slot = sources_by_name(col)[SLOT_SCENE]["settings"]["items"]
+            self.assertEqual({item["name"] for item in slot},
+                             {"SCREEN · Share", f"SCREEN · {remote} Share", "SCREEN · Guest Share"})
+            self.assertEqual([item["name"] for item in slot if item["visible"]], ["SCREEN · Share"])
+
+    def test_host_change_preserves_all_scene_geometry_and_identity_labels(self):
+        chirag, parth = [col for _, col in self.variants()]
+        a, b = sources_by_name(chirag), sources_by_name(parth)
+        self.assertEqual(chirag["scene_order"], parth["scene_order"])
+        for name in [entry["name"] for entry in chirag["scene_order"]]:
+            def visible_geometry(scene):
+                return [(item["name"], box(item)) for item in scene["settings"]["items"]
+                        if item["private_settings"].get("frontier_role") != CARRIER]
+            self.assertEqual(visible_geometry(a[name]), visible_geometry(b[name]))
+        for name, source in a.items():
+            if " Label " in name:
+                self.assertEqual(source["settings"]["url"], b[name]["settings"]["url"])
+
+    def test_parth_local_does_not_require_a_parth_stream_id(self):
+        col = build(ROOM, GUEST_ID, PASSWORD, chirag_id="testchirag", local_host="parth")
+        self.assertEqual(col["name"], "WTF · Parth local")
+
+    def test_invalid_local_host_is_rejected(self):
+        with self.assertRaises(ValueError):
+            build(ROOM, GUEST_ID, PASSWORD, parth_id=PARTH_ID, local_host="guest")
+
+    def test_remote_chirag_id_is_required_for_parth_local(self):
+        with self.assertRaises(ValueError):
+            build(ROOM, GUEST_ID, PASSWORD, parth_id=PARTH_ID, local_host="parth")
+
+    def test_normalized_ids_must_be_distinct(self):
+        with self.assertRaises(ValueError):
+            build(ROOM, "test_guest", PASSWORD, chirag_id="test-guest", local_host="parth")
+
+    def cli(self, *args, **changes):
+        env = dict(os.environ, VDO_ROOM=ROOM, VDO_GUEST_ID=GUEST_ID,
+                   VDO_PARTH_ID=PARTH_ID, VDO_CHIRAG_ID="testchirag", VDO_PASSWORD=PASSWORD)
+        env.update(changes)
+        return subprocess.run([sys.executable, bs.__file__, *args],
+                              env=env, capture_output=True, text=True)
+
+    def test_cli_builds_both_importable_collections(self):
+        with tempfile.TemporaryDirectory() as d:
+            result = self.cli("--both-local-hosts", "-o", os.path.join(d, "podcast_scenes.json"))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            for host in ("chirag", "parth"):
+                with open(os.path.join(d, f"podcast_scenes_{host}_local.json")) as f:
+                    col = json.load(f)
+                self.assertEqual(col["name"], f"WTF · {host.title()} local")
+
+    def test_cli_builds_parth_local_without_parth_id(self):
+        with tempfile.TemporaryDirectory() as d:
+            target = os.path.join(d, "parth.json")
+            result = self.cli("--local-host", "parth", "-o", target, VDO_PARTH_ID="")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            with open(target) as f:
+                self.assertEqual(json.load(f)["name"], "WTF · Parth local")
+
+    def test_dual_generation_validates_before_writing_any_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            result = self.cli("--both-local-hosts", "-o", os.path.join(d, "podcast_scenes.json"),
+                              VDO_CHIRAG_ID=GUEST_ID)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(os.listdir(d), [])
+
+    def test_chirag_link_does_not_require_unrelated_ids(self):
+        result = self.cli("--chirag-link", VDO_GUEST_ID="", VDO_PARTH_ID="")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(parse_qs(urlparse(result.stdout.strip()).query)["push"], ["testchirag"])
+
+    def test_preview_reflects_local_host_without_remote_connections(self):
+        from preview_studio import preview_data
+        for host in ("chirag", "parth"):
+            data = preview_data(host)
+            duo = next(scene for scene in data if scene["name"] == "04 Duo")
+            cameras = [item for item in duo["items"] if item["name"].startswith("CAM · ")]
+            local = [item["name"] for item in cameras if item["capture"] == "Local camera"]
+            self.assertEqual(local, [f"CAM · {host.title()}"])
+            self.assertNotIn("vdo.ninja", json.dumps(data))
+
+
 class TestRecordingVerification(unittest.TestCase):
     """Exercise the real shell verifier with deterministic media-tool fixtures."""
     def setUp(self):

@@ -27,11 +27,12 @@ footer{padding:0 3vw 24px;font-size:13px;color:#B8B3B0}a{color:#F2EBDD}
 </style>
 </head>
 <body>
-<header><div><h1>WTF studio preview</h1><p>Actual scene geometry with illustrative camera placeholders</p></div><label>Scene <select id="scene" aria-label="Scene"></select></label></header>
+<header><div><h1>WTF studio preview</h1><p>Actual scene geometry with illustrative camera placeholders</p></div><label>Collection <select id="local-host" aria-label="Local host"><option value="chirag">WTF · Chirag local</option><option value="parth">WTF · Parth local</option></select></label><label>Scene <select id="scene" aria-label="Scene"></select></label></header>
 <main class="viewport"><div class="stage" id="stage"></div></main>
 <footer>The duo is the default. F1 through F12 switch scenes. These previews do not connect to cameras, microphones or remote feeds.</footer>
 <script>
-const scenes=__SCENE_DATA__;
+const collections=__COLLECTION_DATA__;
+let scenes=collections.chirag;
 const picker=document.getElementById('scene'),stage=document.getElementById('stage');
 for(const scene of scenes){const option=document.createElement('option');option.value=scene.name;option.textContent=scene.name;picker.append(option)}
 function show(name){
@@ -44,12 +45,13 @@ function show(name){
     else if(item.name.startsWith('CAM')){
       const person=item.name.split(' · ')[1];el.classList.add('camera',person.toLowerCase());
       const copy=document.createElement('div');copy.className='placeholder';copy.textContent=person;
-      const note=document.createElement('small');note.textContent='Camera preview';copy.append(note);el.append(copy);
+      const note=document.createElement('small');note.textContent=item.capture+' preview';copy.append(note);el.append(copy);
     }else{el.classList.add('screen');const label=document.createElement('small');label.textContent='Shared content preview';const copy=document.createElement('div');copy.textContent='A window into what comes next.';el.append(label,copy)}
     stage.append(el);
   }
 }
 picker.addEventListener('change',()=>show(picker.value));
+document.getElementById('local-host').addEventListener('change',event=>{scenes=collections[event.target.value];show('04 Duo')});
 document.addEventListener('keydown',e=>{const i=Number(e.key.slice(1))-1;if(/^F\d+$/.test(e.key)&&scenes[i]){e.preventDefault();show(scenes[i].name)}});
 new ResizeObserver(()=>stage.style.transform='scale('+stage.parentElement.clientWidth/1920+')').observe(stage.parentElement);
 show('04 Duo');

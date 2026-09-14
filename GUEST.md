@@ -1,7 +1,7 @@
 # What’s the Frontier · Remote participant setup
 
-Chirag and Parth host the podcast. Chirag runs the studio; Parth and the guest
-each use their own invitation link.
+Chirag and Parth host the podcast. Either host can run the local studio. The
+other host and the guest each use their own invitation link.
 
 Use Chrome or Edge on a laptop or desktop with wired headphones. The studio
 will send your private link. Copy it exactly: the stream ID connects your
@@ -29,7 +29,7 @@ Use the screen-share control if you want to show something. Sharing a window
 keeps unrelated desktop content out of the show. Camera and screen are
 separate sources, so your camera can stay visible while you share.
 
-Wear headphones throughout. Chirag’s director tab handles the conversation
+Wear headphones throughout. The local host’s director tab handles the conversation
 audio; OBS records the separate stems.
 
 ## Before leaving

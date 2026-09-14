@@ -24,7 +24,7 @@ echo "backed up -> $BACKUP"
 
 # Apple VT H264 Hardware Encoder, ID read from this machine's OBS log.
 ENC="com.apple.videotoolbox.videoencoder.ave.avc"
-# Tracks: Chirag, guest, guest share, Parth, Parth share, safety mix.
+# Tracks: Chirag, guest, guest share, Parth, remote host share, safety mix.
 TRACKS=63
 
 python3 - "$INI" "$ENC" "$TRACKS" <<'PY'

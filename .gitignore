@@ -7,12 +7,14 @@
 # Generated links. Each one embeds the room name and password in plaintext.
 guest_link.txt
 parth_link.txt
+chirag_link.txt
 director_link.txt
 view_link.txt
 
 # The built scene collection. Contains the resolved room URLs, so it is a
 # secret artifact too -- regenerate it rather than sharing it.
 podcast_scenes.json
+podcast_scenes_*_local.json
 
 # Intermediate render screenshots from asset development.
 render/

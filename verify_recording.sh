@@ -17,7 +17,7 @@ REC_DIR="$HOME/Movies"
 # Settings > Output > Recording. ffmpeg indexes audio streams from 0, so the
 # mapping is track N -> stream a:N-1 with all six tracks enabled. Reject a
 # different track count before applying these positional labels.
-EXPECTED=("Chirag mic" "Guest voice" "Guest screen audio" "Parth voice" "Parth screen audio" "Safety mix")
+EXPECTED=("Chirag voice" "Guest voice" "Guest screen audio" "Parth voice" "Remote host screen audio" "Safety mix")
 REQUIRED=(1 0 0 1 0 1)
 
 # Guests and screen audio are optional in the default duo format.

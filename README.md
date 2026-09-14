@@ -1,7 +1,7 @@
 # What’s the Frontier · OBS studio
 
 A podcast studio for Chirag and Parth, with an optional third participant.
-The generated collection opens on **04 Duo**. It includes twelve scenes,
+Each generated collection opens on **04 Duo**. It includes twelve scenes,
 separate remote camera and screen feeds, six audio tracks, and a local preview.
 
 The design uses the WTF brand board: Event Horizon `#07080D`, Signal Bone
@@ -51,22 +51,29 @@ The canvas is 1920 × 1080. The top strip occupies 96 pixels and the lower panel
 196 pixels, leaving a 756-pixel camera band with breathing room above and below.
 Camera name labels stay attached to their corresponding feeds in every layout.
 
-## Capture arrangement
+## Choose the local host in OBS
 
-The existing local-host arrangement is retained:
+Import the two generated collections once, then select the local host from
+OBS’s **Scene Collection** menu before recording:
 
-- Chirag operates OBS, with a local camera and microphone.
-- Parth joins through his own VDO.Ninja camera and screen feeds.
-- The optional guest joins with a different stream ID and independent feeds.
+- **WTF · Chirag local** uses Chirag’s local camera and microphone. Parth joins remotely.
+- **WTF · Parth local** uses Parth’s local camera and microphone. Chirag joins remotely.
 
-Assign the camera and microphone in the properties of **CAM · Chirag** and
-**MIC · Chirag**. Assign the local screen in **SCREEN · Share**. Hardware IDs
-are intentionally left unset so the collection does not bind to another
-machine’s devices.
+Both choices have the same duo default, guest scenes, layouts and branding.
+The optional guest always has an independent feed. This uses OBS’s native
+[Scene Collections](https://obsproject.com/kb/scene-collections) feature and
+requires no additional OBS plugin.
 
-Remote sources are receive-only and do not restart when scenes change.
-Chirag uses the VDO.Ninja director tab, with headphones, for talkback with
-Parth and the guest. OBS monitoring stays off to avoid hearing a second copy.
+Assign your camera and microphone once in the chosen collection’s **CAM** and
+**MIC** sources named after you. Assign the local screen in **SCREEN · Share**.
+Hardware IDs are intentionally unset so the collection can be imported on
+either host’s computer. Select the collection before starting a recording;
+changing collections replaces sources and reconnects the remote feeds.
+
+The local operator uses the VDO.Ninja director tab, with headphones, for
+talkback with the remote cohost and guest. Remote sources are receive-only
+and do not restart when switching scenes within a collection. OBS monitoring
+stays off to avoid hearing a second copy.
 
 ## Generate the collection
 
@@ -78,19 +85,30 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-Fill in `VDO_ROOM`, `VDO_PARTH_ID`, `VDO_GUEST_ID` and `VDO_PASSWORD`
-using the examples in that file. Use different stream IDs for Parth and the
-guest, including on episodes without a guest.
+Fill in `VDO_ROOM`, `VDO_CHIRAG_ID`, `VDO_PARTH_ID`, `VDO_GUEST_ID` and
+`VDO_PASSWORD` using the examples in that file. Give all three people distinct
+stream IDs, including on episodes without a guest.
 
 ```bash
 set -a
 . ./.env
 set +a
 
-python3 build_scenes.py --episode 01 --title "Conversations at the edge of possible"
+python3 build_scenes.py --both-local-hosts --episode 01 --title "Conversations at the edge of possible"
 python3 build_scenes.py --parth-link
+python3 build_scenes.py --chirag-link
 python3 build_scenes.py --guest-link
 ```
+
+The dual build creates `podcast_scenes_chirag_local.json` and
+`podcast_scenes_parth_local.json`. Send the remote cohost their corresponding
+invitation. The local operator uses the director tab rather than their own
+remote invitation.
+
+To generate only one variant, use `--local-host chirag` or `--local-host parth`.
+This writes `podcast_scenes.json` and requires only the remote cohost’s ID and
+the guest ID. The original command without a host flag still defaults to
+Chirag local for compatibility.
 
 For a guest episode, include `--guest-name "Guest Name"` and
 `--guest-role "Guest role"`. These update the camera labels.
@@ -103,8 +121,9 @@ computer. See [GUEST.md](GUEST.md) for the recording checklist.
 
 ## Import into OBS
 
-Generate `podcast_scenes.json`, then use **Scene Collection → Import** in OBS.
-Choose the imported **What's the Frontier** collection. It starts on the duo.
+Generate both local-host variants, then use **Scene Collection → Import** in
+OBS to import both JSON files. Choose **WTF · Chirag local** or **WTF · Parth
+local** from the Scene Collection menu. Both start on the duo.
 The collection points at this checkout’s absolute asset paths, so keep the
 folder in place and regenerate if you move it.
 
@@ -126,13 +145,15 @@ configuration. Those installation steps are explicit.
 
 | Track | Audio |
 | --- | --- |
-| 1 | Chirag microphone |
+| 1 | Chirag voice, local or remote |
 | 2 | Guest voice |
 | 3 | Guest screen audio |
-| 4 | Parth voice |
-| 5 | Parth screen audio |
+| 4 | Parth voice, local or remote |
+| 5 | Remote cohost screen audio |
 | 6 | Safety mix of all inputs |
 
+Voice track numbers remain consistent when the local host changes. Track 5
+contains the remote cohost’s screen audio, which can belong to either host.
 Every scene references the local microphone and keeps the remote sources
 active beneath the opaque backing, so switching to a screen or standby card
 does not drop audio. The same underlying OBS source is reused across scenes.

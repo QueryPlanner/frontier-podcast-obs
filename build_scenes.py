@@ -13,17 +13,19 @@ The remote guest arrives over VDO.Ninja (WebRTC) rather than by screen-capturing
 a call window, so their camera and their screen share are two independently
 addressable streams. See TRANSPORT below for the full signal path.
 
-Usage: set VDO_ROOM, VDO_PARTH_ID and VDO_GUEST_ID, then run this file.
+Usage: set VDO_ROOM and participant IDs, then use --both-local-hosts to
+generate both collection choices for OBS, or --local-host for one variant.
 """
 
 import argparse
 import json
 import os
 import uuid
+from pathlib import Path
 from urllib.parse import quote
 
 CANVAS_W, CANVAS_H = 1920, 1080
-COLLECTION_NAME = "What's the Frontier"
+COLLECTION_NAME = "WTF"
 ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
 # Audio track bitmask: track N is bit (N-1).
@@ -31,18 +33,18 @@ TRACK_1, TRACK_2, TRACK_3, TRACK_6 = 1 << 0, 1 << 1, 1 << 2, 1 << 5
 TRACK_4, TRACK_5 = 1 << 3, 1 << 4
 
 # --- TRANSPORT --------------------------------------------------------------
-# Host  : joins https://vdo.ninja/?director=ROOM in Chrome, wearing headphones.
+# Local : the selected host joins the room's director tab wearing headphones.
 #         That tab is the *talkback* path -- it is how the guest hears the host,
 #         and how the host hears the guest. OBS never plays guest audio out
 #         (every source keeps monitoring_type 0); if it did, the host would hear
 #         the guest twice at different latencies, which combs rather than adds.
-#         The host's own voice is recorded from the local interface by MIC · Chirag,
+#         The host's own voice is recorded from the local interface by MIC,
 #         not from the browser, so it stays uncompressed and ~0ms.
 # Guest : opens the push link printed by --guest-link. That link also carries
 #         &record, so their browser writes a pristine local copy to disk while
 #         the compressed WebRTC feed drives these scenes. Clap at the top of the
 #         episode; it is the sync point for swapping that file in during the edit.
-# Parth : opens --parth-link as the cohost, with the same recording workflow.
+# Cohost: opens --parth-link or --chirag-link, depending on who is remote.
 # OBS   : receive-only. Four browser sources receive the two remote people.
 VDO = "https://vdo.ninja/"
 
@@ -298,15 +300,24 @@ def guest_link(room, guest_id, password=None, record_kbps=6000):
                    password=password, record=record_kbps)
 
 
-def build(room, guest_id, password=None, *, parth_id=None,
+def build(room, guest_id, password=None, *, parth_id=None, chirag_id=None,
+          local_host="chirag",
           episode="01", title="Conversations at the edge of possible",
           guest_name="Guest", guest_role="In conversation"):
-    if not room or not guest_id or not parth_id:
-        raise ValueError("room, guest_id and parth_id are required")
+    if local_host not in ("chirag", "parth"):
+        raise ValueError("local_host must be chirag or parth")
+    remote_host = "parth" if local_host == "chirag" else "chirag"
+    host_ids = {"chirag": chirag_id, "parth": parth_id}
+    if not room or not guest_id or not host_ids[remote_host]:
+        raise ValueError(f"room, guest_id and {remote_host}_id are required")
     room = check_room(room)
-    guest_id, parth_id = stream_id(guest_id), stream_id(parth_id)
-    if guest_id == parth_id:
-        raise ValueError("Parth and the guest need distinct stream IDs")
+    guest_id = stream_id(guest_id)
+    host_ids = {name: stream_id(value) for name, value in host_ids.items() if value}
+    ids = [guest_id, *host_ids.values()]
+    if len(set(ids)) != len(ids):
+        raise ValueError("Chirag, Parth and the guest need distinct stream IDs")
+    local_name, remote_name = local_host.title(), remote_host.title()
+    voice_tracks = {"chirag": TRACK_1, "parth": TRACK_4}
     c = Collection()
 
     show = "what’s the frontier"
@@ -314,16 +325,17 @@ def build(room, guest_id, password=None, *, parth_id=None,
     common = dict(show=show, episode=episode)
     identity = dict(hosts=hosts, chiragSite="lordpatil.com",
                     parthSite="parthshastri.co.in")
-    c.source("macos-avcapture", "CAM · Chirag")
+    c.source("macos-avcapture", f"CAM · {local_name}")
     c.source("screen_capture", "SCREEN · Share")
-    c.source("coreaudio_input_capture", "MIC · Chirag", mixers=TRACK_1 | TRACK_6)
+    c.source("coreaudio_input_capture", f"MIC · {local_name}",
+             mixers=voice_tracks[local_host] | TRACK_6)
 
-    # Chirag operates the local studio. Parth and the optional guest each
-    # publish an independent camera and share, with independent audio stems.
+    # The selected host operates the local studio. Voice track numbers stay
+    # attached to the people, even when local and remote capture swap roles.
     view = dict(room=room, password=password, solo=True,
                 cleanoutput=True, transparent=True)
     for person, sid, voice, share in (
-        ("Parth", parth_id, TRACK_4, TRACK_5),
+        (remote_name, host_ids[remote_host], voice_tracks[remote_host], TRACK_5),
         ("Guest", guest_id, TRACK_2, TRACK_3),
     ):
         c.remote(f"CAM · {person}",
@@ -361,7 +373,8 @@ def build(room, guest_id, password=None, *, parth_id=None,
         items += [c.item("BG · Starfield", *full), c.item("BG · Void", *full)]
         # Local mic must also be referenced by each scene. Sources that only
         # exist in the collection are not automatically global audio devices.
-        for name in ("MIC · Chirag", "CAM · Parth", "SCREEN · Parth Share",
+        for name in (f"MIC · {local_name}", f"CAM · {remote_name}",
+                     f"SCREEN · {remote_name} Share",
                      "CAM · Guest", "SCREEN · Guest Share"):
             items += c.carrier(name)
         return items
@@ -388,7 +401,7 @@ def build(room, guest_id, password=None, *, parth_id=None,
     # is visible by default. Switching this slot does not reconnect WebRTC.
     c.scene("SLOT · Content", [
         c.item("SCREEN · Guest Share", *full, visible=False, role=SLOT),
-        c.item("SCREEN · Parth Share", *full, visible=False, role=SLOT),
+        c.item(f"SCREEN · {remote_name} Share", *full, visible=False, role=SLOT),
         c.item("SCREEN · Share", *full, role=SLOT),
     ], custom_size=True)
 
@@ -450,7 +463,7 @@ def build(room, guest_id, password=None, *, parth_id=None,
     c.scene("12 Break", layers([c.item("CARD · Break", *full)]), "OBS_KEY_F12")
 
     return {
-        "name": COLLECTION_NAME,
+        "name": f"{COLLECTION_NAME} · {local_name} local",
         "current_scene": "04 Duo", "current_program_scene": "04 Duo",
         "current_transition": "Fade", "transition_duration": 300,
         "transitions": [], "quick_transitions": [],
@@ -467,9 +480,15 @@ def build(room, guest_id, password=None, *, parth_id=None,
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Generate the WTF duo podcast studio.")
     ap.add_argument("-o", "--output", default="podcast_scenes.json")
+    modes = ap.add_mutually_exclusive_group()
+    modes.add_argument("--local-host", choices=("chirag", "parth"), default="chirag",
+                       help="choose whose camera and microphone are local")
+    modes.add_argument("--both-local-hosts", action="store_true",
+                       help="generate both collections for selection in OBS")
     links = ap.add_mutually_exclusive_group()
     links.add_argument("--guest-link", action="store_true", help="print the guest invitation")
     links.add_argument("--parth-link", action="store_true", help="print Parth's invitation")
+    links.add_argument("--chirag-link", action="store_true", help="print Chirag's invitation")
     ap.add_argument("--episode", default="01")
     ap.add_argument("--title", default="Conversations at the edge of possible")
     ap.add_argument("--guest-name", default="Guest")
@@ -478,24 +497,37 @@ if __name__ == "__main__":
     room = os.environ.get("VDO_ROOM")
     guest = os.environ.get("VDO_GUEST_ID")
     parth = os.environ.get("VDO_PARTH_ID")
+    chirag = os.environ.get("VDO_CHIRAG_ID")
     password = os.environ.get("VDO_PASSWORD")
     required = [("VDO_ROOM", room)]
-    if not args.parth_link:
-        required.append(("VDO_GUEST_ID", guest))
-    if not args.guest_link:
-        required.append(("VDO_PARTH_ID", parth))
+    invitation = ("guest" if args.guest_link else "parth" if args.parth_link
+                  else "chirag" if args.chirag_link else None)
+    if invitation and args.both_local_hosts:
+        ap.error("generate collections or print an invitation in separate commands")
+    ids = {"guest": guest, "parth": parth, "chirag": chirag}
+    local_hosts = ("chirag", "parth") if args.both_local_hosts else (args.local_host,)
+    needed = [invitation] if invitation else [
+        "guest", *("parth" if host == "chirag" else "chirag" for host in local_hosts)]
+    required.extend((f"VDO_{person.upper()}_ID", ids[person]) for person in needed)
     missing = [name for name, value in required if not value]
     if missing:
         ap.error(f"{', '.join(missing)} not set. See .env.example for setup.")
     try:
-        if args.guest_link or args.parth_link:
-            print(guest_link(room, parth if args.parth_link else guest, password))
+        if invitation:
+            print(guest_link(room, ids[invitation], password))
         else:
-            result = build(room, guest, password, parth_id=parth,
-                           episode=args.episode, title=args.title,
-                           guest_name=args.guest_name, guest_role=args.guest_role)
-            with open(args.output, "w") as f:
-                json.dump(result, f, indent=4)
-            print(f"wrote {args.output}")
+            # Validate both variants before writing either file.
+            collections = [(host, build(
+                room, guest, password, parth_id=parth, chirag_id=chirag,
+                local_host=host, episode=args.episode, title=args.title,
+                guest_name=args.guest_name, guest_role=args.guest_role))
+                for host in local_hosts]
+            output = Path(args.output)
+            for host, result in collections:
+                target = output.with_name(f"{output.stem}_{host}_local{output.suffix}") \
+                    if args.both_local_hosts else output
+                with target.open("w") as f:
+                    json.dump(result, f, indent=4)
+                print(f"wrote {target} ({result['name']})")
     except ValueError as exc:
         ap.error(str(exc))

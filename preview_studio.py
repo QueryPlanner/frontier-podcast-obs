@@ -6,8 +6,9 @@ from pathlib import Path
 from build_scenes import build, CARRIER
 
 
-def preview_data():
-    collection = build("previewroom", "previewguest", parth_id="previewparth")
+def preview_data(local_host="chirag"):
+    collection = build("previewroom", "previewguest", parth_id="previewparth",
+                       chirag_id="previewchirag", local_host=local_host)
     sources = {source["name"]: source for source in collection["sources"]}
     result = []
     for entry in collection["scene_order"]:
@@ -19,6 +20,8 @@ def preview_data():
             source = sources[item["name"]]
             record = dict(name=item["name"], x=item["pos"]["x"], y=item["pos"]["y"],
                           w=item["bounds"]["x"], h=item["bounds"]["y"])
+            if item["name"].startswith("CAM · "):
+                record["capture"] = "Local camera" if source["id"] == "macos-avcapture" else "Remote camera"
             if source["id"] == "browser_source" and "vdo.ninja" not in source["settings"]["url"]:
                 url = source["settings"]["url"]
                 # Keep the preview relocatable with the assets beside it.
@@ -36,7 +39,8 @@ def render():
     output = Path(__file__).with_name("render")
     output.mkdir(exist_ok=True)
     path = output / "studio-preview.html"
-    path.write_text(template.replace("__SCENE_DATA__", json.dumps(preview_data())))
+    choices = {host: preview_data(host) for host in ("chirag", "parth")}
+    path.write_text(template.replace("__COLLECTION_DATA__", json.dumps(choices)))
     return path
 
 
