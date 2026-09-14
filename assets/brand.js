@@ -6,6 +6,31 @@
     return value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\u2014/g, ", ")
       .replace(/\//g, " · ").replace(/\s+/g, " ").trim().slice(0, limit);
   }
+  // One source for the WTF mark. Every overlay hydrates a [data-logo]
+  // placeholder from it, so the 12-second signal and its motion controls
+  // behave identically at 165px in the lower stack and 1000px on a card.
+  const ORBIT = "M 55,195 A 395,117 0 1 1 845,195 A 395,117 0 1 1 55,195";
+  const WORDMARK = "M163.68-174.24L182.40-65.52L194.88-174.24L253.44-174.24L221.28 0L147.60 0L131.28-97.20L112.32 0L41.76 0L9.60-174.24L68.16-174.24L80.40-66.96L99.60-174.24L163.68-174.24M466.80-174.24L466.80-123.84Q429.12-125.04 393.60-125.28L393.60 0L333.60 0L333.60-125.28Q297.84-125.04 260.64-123.84L260.64-174.24L466.80-174.24M661.20-174.24L661.20-129.36L530.64-129.36L530.64-104.16Q542.88-103.92 567.36-103.92Q609.60-103.92 653.28-105.36L653.28-58.32Q609.60-60 561.12-60Q540.96-60 530.64-59.76L530.64 0L474 0Q475.92-46.56 475.92-87.12Q475.92-127.68 474-174.24";
+  const LOGO = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 390" fill="none" role="img" aria-label="WTF orbital logo">
+<g transform="rotate(-12 450 195)">
+<path d="${ORBIT}" stroke="#8B7CFF" stroke-opacity=".42" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<path d="M 55,195 A 395,117 0 0 1 450,78" stroke="#8B7CFF" stroke-width="3" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+<g class="traveller"><g class="signal"><circle r="11" fill="#FF9D62" fill-opacity=".12"/><circle r="4.5" fill="#FF9D62"/></g><animateMotion dur="12s" repeatCount="indefinite" path="${ORBIT}"/></g>
+<g class="resting-signal" transform="translate(55 195)" style="display:none"><g class="signal"><circle r="4.5" fill="#FF9D62"/></g></g>
+</g>
+<path d="${WORDMARK}" transform="translate(114.6 282)" fill="#F2EBDD"/>
+</svg>`;
+  document.querySelectorAll("[data-logo]").forEach(el => {
+    const tpl = document.createElement("template");
+    tpl.innerHTML = LOGO;
+    const svg = tpl.content.firstElementChild;
+    svg.setAttribute("class", `wtf-mark ${el.className}`.trim());
+    el.replaceWith(svg);
+    // Strokes use non-scaling-stroke; the signal is scaled by hand so it
+    // stays 4.5px wide on screen whatever size the mark is drawn at.
+    const k = 900 / (svg.getBoundingClientRect().width || 900);
+    svg.querySelectorAll(".signal").forEach(g => g.setAttribute("transform", `scale(${k.toFixed(4)})`));
+  });
   document.querySelectorAll("[data-copy]").forEach(el => {
     el.textContent = readText(el.dataset.copy, el.textContent, Number(el.dataset.limit) || 120);
   });

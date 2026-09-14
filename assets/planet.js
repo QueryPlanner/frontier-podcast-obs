@@ -1,73 +1,146 @@
-// Orthographic sphere and ring intersections. All colors are composited
-    // back to front; the planet is opaque even on its unlit hemisphere.
-    (() => {
-      const canvas = document.getElementById('planet');
-      const ctx = canvas.getContext('2d');
-      const size = canvas.width;
-      const image = ctx.createImageData(size, size);
-      const data = image.data;
-      const light = [-0.58, 0.57, 0.582];
-      const normal = [0.337, 0.834, 0.437];
-      const dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
-      const mix = (a, b, t) => a.map((v, i) => v*(1-t)+b[i]*t);
-      const smooth = (a,b,x) => { const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); };
-      function ringAt(x,y,z) {
-        const r = Math.hypot(x,y,z);
-        if (r<1.28 || r>2.16) return null;
-        const edge = smooth(1.28,1.32,r)*(1-smooth(2.12,2.16,r));
-        const gap = 1-.94*smooth(1.74,1.754,r)*(1-smooth(1.793,1.81,r));
-        const bands = .56+.17*Math.sin(r*210)+.10*Math.sin(r*487)+.08*Math.sin(r*91);
-        const warmth = .5+.5*Math.sin(r*10);
-        let color = mix([146,144,206],[231,194,157],warmth);
-        const toward = x*light[0]+y*light[1]+z*light[2];
-        // A ray from a ring particle toward the light may intersect the globe.
-        const blocked = toward<0 && r*r-toward*toward<1;
-        color=color.map(v=>v*(blocked?.13:.91));
-        return { color, alpha: edge*gap*bands*.80 };
-      }
-      for(let py=0;py<size;py++) for(let px=0;px<size;px++) {
-        const x=(px+.5-size/2)*4.8/size;
-        const y=(size/2-py-.5)*4.8/size;
-        const radius2=x*x+y*y;
-        const rz=-(normal[0]*x+normal[1]*y)/normal[2];
-        const ring=ringAt(x,y,rz);
-        let color=[0,0,0], alpha=0;
-        const blend=(c,a)=> {
-          const next=a+alpha*(1-a);
-          color=color.map((v,i)=>(c[i]*a+v*alpha*(1-a))/(next||1));
-          alpha=next;
-        };
-        if(ring) blend(ring.color,ring.alpha);
-        if(radius2<=1) {
-          const z=Math.sqrt(1-radius2);
-          const p=[x,y,z];
-          const lat=dot(normal,p);
-          const swirl=.024*Math.sin(x*19+z*11)+.015*Math.sin(z*33-y*17)+.008*Math.sin(x*67+y*31);
-          const band=.5+.5*Math.sin((lat+swirl)*39);
-          const detail=.5+.5*Math.sin((lat+swirl*.7)*132);
-          let surface=mix([62,66,134],[142,133,192],band*.78+detail*.12);
-          const storm=Math.exp(-((x+.25)**2*50+(lat-.14)**2*240));
-          surface=mix(surface,[184,162,181],storm*.55);
-          let illumination=Math.max(0,dot(p,light));
-          // Project the planet's point toward the light onto the ring plane.
-          const t=-lat/dot(normal,light);
-          if(t>0 && illumination>0) {
-            const cast=ringAt(x+light[0]*t,y+light[1]*t,z+light[2]*t);
-            if(cast) illumination*=1-cast.alpha*.82;
-          }
-          const rim=Math.pow(1-z,3)*Math.max(0,dot(p,light))*.27;
-          color=surface.map((v,i)=>v*(.055+.96*illumination)+[90,100,185][i]*rim);
-          alpha=1;
-          // Only the ring intersection in front of the sphere can show here.
-          if(ring && rz>z) blend(ring.color,ring.alpha);
-        } else if(radius2<1.085) {
-          const r=Math.sqrt(radius2);
-          const lit=Math.max(0,(x*light[0]+y*light[1])/r);
-          const haze=Math.exp(-(r-1)*110)*lit*.46;
-          blend([133,145,233],haze);
+// Orthographic sphere and ring intersections, drawn per frame on the GPU.
+// The surface turns once every 150 seconds around the planet's tilted axis;
+// rings, lighting, ring shadow and haze stay fixed to the light. Colors are
+// composited back to front and the planet is opaque on its unlit hemisphere.
+(() => {
+  const canvas = document.getElementById("planet");
+  const params = new URLSearchParams(location.search);
+  const t = params.get("t");
+  const frozen = t !== null && t.trim() !== "" && Number.isFinite(Number(t)) && Number(t) >= 0;
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+  const ROTATION_PERIOD = 150;
+
+  const VERTEX = `attribute vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }`;
+  const FRAGMENT = `
+    precision highp float;
+    uniform float u_time;
+    uniform float u_size;
+    const vec3 light = vec3(-0.58, 0.57, 0.582);
+    const vec3 axis = vec3(0.337, 0.834, 0.437);
+    const float TAU = 6.283185307179586;
+
+    // rgb in 0..255 plus coverage; coverage 0 means no ring at this point.
+    vec4 ringAt(vec3 q) {
+      float r = length(q);
+      if (r < 1.28 || r > 2.16) return vec4(0.0);
+      float edge = smoothstep(1.28, 1.32, r) * (1.0 - smoothstep(2.12, 2.16, r));
+      float gap = 1.0 - 0.94 * smoothstep(1.74, 1.754, r) * (1.0 - smoothstep(1.793, 1.81, r));
+      float bands = 0.56 + 0.17 * sin(r * 210.0) + 0.10 * sin(r * 487.0) + 0.08 * sin(r * 91.0);
+      float warmth = 0.5 + 0.5 * sin(r * 10.0);
+      vec3 color = mix(vec3(146.0, 144.0, 206.0), vec3(231.0, 194.0, 157.0), warmth);
+      float toward = dot(q, light);
+      // A ray from a ring particle toward the light may intersect the globe.
+      bool blocked = toward < 0.0 && r * r - toward * toward < 1.0;
+      color *= blocked ? 0.13 : 0.91;
+      return vec4(color, edge * gap * bands * 0.80);
+    }
+
+    void blend(inout vec3 color, inout float alpha, vec3 c, float a) {
+      float next = a + alpha * (1.0 - a);
+      color = (c * a + color * alpha * (1.0 - a)) / max(next, 1e-6);
+      alpha = next;
+    }
+
+    vec3 spin(vec3 p, float angle) {
+      float c = cos(angle), s = sin(angle);
+      return p * c + cross(axis, p) * s + axis * dot(axis, p) * (1.0 - c);
+    }
+
+    void main() {
+      float x = (gl_FragCoord.x - u_size / 2.0) * 4.8 / u_size;
+      float y = (gl_FragCoord.y - u_size / 2.0) * 4.8 / u_size;
+      float radius2 = x * x + y * y;
+      float rz = -(axis.x * x + axis.y * y) / axis.z;
+      vec4 ring = ringAt(vec3(x, y, rz));
+      vec3 color = vec3(0.0);
+      float alpha = 0.0;
+      if (ring.a > 0.0) blend(color, alpha, ring.rgb, ring.a);
+      if (radius2 <= 1.0) {
+        float z = sqrt(1.0 - radius2);
+        vec3 p = vec3(x, y, z);
+        float lat = dot(axis, p);
+        // Surface features live in the rotating frame; latitude does not move.
+        vec3 q = spin(p, u_time * TAU / ${ROTATION_PERIOD}.0);
+        float swirl = 0.024 * sin(q.x * 19.0 + q.z * 11.0) + 0.015 * sin(q.z * 33.0 - q.y * 17.0) + 0.008 * sin(q.x * 67.0 + q.y * 31.0);
+        float band = 0.5 + 0.5 * sin((lat + swirl) * 39.0);
+        float detail = 0.5 + 0.5 * sin((lat + swirl * 0.7) * 132.0);
+        vec3 surface = mix(vec3(62.0, 66.0, 134.0), vec3(142.0, 133.0, 192.0), band * 0.78 + detail * 0.12);
+        // One storm, baked on the hemisphere that faced the viewer at t=0.
+        float storm = exp(-((q.x + 0.25) * (q.x + 0.25) * 50.0 + (lat - 0.14) * (lat - 0.14) * 240.0)) * smoothstep(0.0, 0.4, q.z);
+        surface = mix(surface, vec3(184.0, 162.0, 181.0), storm * 0.55);
+        float illumination = max(0.0, dot(p, light));
+        // Project the planet's point toward the light onto the ring plane.
+        float toPlane = -lat / dot(axis, light);
+        if (toPlane > 0.0 && illumination > 0.0) {
+          vec4 shadow = ringAt(p + light * toPlane);
+          if (shadow.a > 0.0) illumination *= 1.0 - shadow.a * 0.82;
         }
-        const i=(py*size+px)*4;
-        data[i]=color[0]; data[i+1]=color[1]; data[i+2]=color[2]; data[i+3]=alpha*255;
+        float rim = pow(1.0 - z, 3.0) * max(0.0, dot(p, light)) * 0.27;
+        color = surface * (0.055 + 0.96 * illumination) + vec3(90.0, 100.0, 185.0) * rim;
+        alpha = 1.0;
+        // Only the ring intersection in front of the sphere can show here.
+        if (ring.a > 0.0 && rz > z) blend(color, alpha, ring.rgb, ring.a);
+      } else if (radius2 < 1.085) {
+        float r = sqrt(radius2);
+        float lit = max(0.0, (x * light.x + y * light.y) / r);
+        float haze = exp(-(r - 1.0) * 110.0) * lit * 0.46;
+        blend(color, alpha, vec3(133.0, 145.0, 233.0), haze);
       }
-      ctx.putImageData(image,0,0);
-    })();
+      gl_FragColor = vec4(color / 255.0, alpha);
+    }`;
+
+  // Straight alpha matches the transparent page compositing; the buffer is
+  // preserved so the canvas can be inspected and copied after a frame.
+  const gl = canvas.getContext("webgl", {
+    alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: true, antialias: false,
+  });
+  if (!gl) { canvas.dataset.renderer = "unavailable"; return; }
+
+  function compile(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      throw new Error("planet shader: " + gl.getShaderInfoLog(shader));
+    }
+    return shader;
+  }
+  const program = gl.createProgram();
+  gl.attachShader(program, compile(gl.VERTEX_SHADER, VERTEX));
+  gl.attachShader(program, compile(gl.FRAGMENT_SHADER, FRAGMENT));
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    throw new Error("planet program: " + gl.getProgramInfoLog(program));
+  }
+  gl.useProgram(program);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  const position = gl.getAttribLocation(program, "a");
+  gl.enableVertexAttribArray(position);
+  gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.uniform1f(gl.getUniformLocation(program, "u_size"), canvas.width);
+  const uTime = gl.getUniformLocation(program, "u_time");
+
+  function draw(seconds) {
+    gl.uniform1f(uTime, seconds);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  const started = performance.now();
+  let pending = 0;
+  function frame(now) {
+    pending = 0;
+    if (frozen || reduced.matches) return;
+    draw((now - started) / 1000);
+    pending = requestAnimationFrame(frame);
+  }
+  function syncMotion() {
+    if (frozen) { draw(Number(t)); return; }
+    if (reduced.matches) { draw(0); return; }
+    if (!pending) pending = requestAnimationFrame(frame);
+  }
+  reduced.addEventListener("change", syncMotion);
+  canvas.dataset.renderer = "webgl";
+  syncMotion();
+})();

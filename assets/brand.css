@@ -38,6 +38,7 @@ h1,h2,p { margin:0; }
 .topbar .details > * + * { border-left:1px solid var(--rule); padding-left:32px; }
 .lower { width:1920px; height:196px; padding:0 48px 24px; }
 .lower-grid { display:grid; grid-template-columns:168px minmax(0,1fr) 650px; height:100%; gap:28px; align-items:center; border-top:1px solid var(--rule); }
+.wtf-mark { display:block; height:auto; overflow:visible; }
 .lower-logo { width:165px; }
 .lower .episode-title { font-size:36px; line-height:1.25; font-variation-settings:"wdth" 110,"wght" 570; letter-spacing:-.035em; max-height:92px; }
 .lower .episode-meta { margin-bottom:12px; font-size:12px; }

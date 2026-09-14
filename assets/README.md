@@ -1,7 +1,10 @@
 # Asset provenance
 
 The WTF mark, palette, orbital animation and planet renderer are based on the
-approved HTML brand board in the parent workspace.
+approved HTML brand board in the parent workspace. The mark is embedded as a
+template in `brand.js` rather than a separate SVG file so the signal animates
+and freezes identically wherever it is drawn. The planet is rendered on the
+GPU by the fragment shader in `planet.js`.
 
 `bev-logo.svg` contains the supplied attachment artwork named
 `Brand Identity/SVG/Full logo.svg`. It preserves the original blue, red and

@@ -189,11 +189,15 @@ Browser tests use Chrome or Brave when found in the standard macOS locations.
 Set `CHROME` to another executable, or install the test browser with
 `npx playwright install chromium`. Node 20 or later is required for these tests.
 
-Shared styles and copy handling live in `assets/brand.css` and
-`assets/brand.js`. The planet uses sphere and ring depth calculations, a
-shared light direction and translucent rings. The standby signal follows a
-12-second loop while the wordmark remains steady. Reduced-motion settings are
-respected. Append `?t=3` to an asset URL to freeze motion for visual checks.
+Shared styles, copy handling and the WTF mark live in `assets/brand.css` and
+`assets/brand.js`. Every overlay that shows the mark, including the lower
+stack, hydrates it from the one template in `brand.js`, so the orbital signal
+completes a 12-second loop at every size while the wordmark remains steady.
+The planet in `assets/planet.js` is a WebGL shader using sphere and ring depth
+calculations, a shared light direction and translucent rings. Its surface
+turns once every 150 seconds while the rings, lighting and ring shadow stay
+fixed. Reduced-motion settings hold both still. Append `?t=3` to an asset URL
+to freeze motion at that second for visual checks.
 
 ## License
 

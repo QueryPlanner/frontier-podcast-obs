@@ -83,30 +83,77 @@ test('guest name and role fit the narrowest camera rail',async()=>{
   await open('participant_label.html',488,64,'?name=Dr.%20Alexandra%20Chandrasekhar&role=AI%20Researcher');
   assert.ok(await page.locator('.name').evaluate(e=>e.scrollWidth<=e.clientWidth+1));
 });
-test('standby signal animates and debug time can freeze it',async()=>{
-  await open('title_card.html');
-  const before=await page.locator('.traveller').boundingBox();
-  await page.waitForTimeout(180);
-  const after=await page.locator('.traveller').boundingBox();
-  assert.notEqual(before.x,after.x);
-  await open('title_card.html',1920,1080,'?t=3');
-  assert.ok(await page.locator('svg').evaluate(e=>e.animationsPaused()));
-  assert.equal(await page.locator('svg').evaluate(e=>e.getCurrentTime()),3);
+const LOGO_PAGES=[['title_card.html',1920,1080],['lower_stack.html',1920,196],['outro_card.html',1920,1080]];
+test('the orbital signal travels on every logo and debug time can freeze it',async()=>{
+  for(const [file,w,h] of LOGO_PAGES){
+    await open(file,w,h);
+    assert.equal(await page.locator('img[src$="wtf-logo.svg"]').count(),0,file+' still embeds a static logo');
+    assert.equal(await page.locator('svg .traveller').count(),1,file);
+    const before=await page.locator('.traveller').boundingBox();
+    await page.waitForTimeout(180);
+    const after=await page.locator('.traveller').boundingBox();
+    assert.notEqual(before.x,after.x,file+' signal does not move');
+    await open(file,w,h,'?t=3');
+    assert.ok(await page.locator('svg').evaluate(e=>e.animationsPaused()),file);
+    assert.equal(await page.locator('svg').evaluate(e=>e.getCurrentTime()),3,file);
+  }
 });
-test('reduced motion pauses the orbital signal',async()=>{
+test('the signal keeps a legible on-screen size at every logo scale',async()=>{
+  const sizes={};
+  for(const [file,w,h] of LOGO_PAGES){
+    await open(file,w,h,'?t=3');
+    sizes[file]=await page.locator('.traveller').boundingBox();
+    const arc=await page.locator('svg path[stroke-width="3"]').evaluate(e=>getComputedStyle(e).vectorEffect);
+    assert.equal(arc,'non-scaling-stroke',file+' arc thins with the logo');
+  }
+  for(const [file,box] of Object.entries(sizes)){
+    assert.ok(box.width>=18&&box.width<=30,file+' signal is '+box.width+'px wide');
+    assert.ok(Math.abs(box.width-sizes['title_card.html'].width)<2,file+' signal differs from the standby card');
+  }
+});
+test('reduced motion rests the signal on every logo',async()=>{
   await page.emulateMedia({reducedMotion:'reduce'});
-  await open('title_card.html');
-  assert.ok(await page.locator('svg').evaluate(e=>e.animationsPaused()));
-  assert.equal(await page.locator('.traveller').evaluate(e=>getComputedStyle(e).display),'none');
+  for(const [file,w,h] of LOGO_PAGES){
+    await open(file,w,h);
+    assert.ok(await page.locator('svg').evaluate(e=>e.animationsPaused()),file);
+    assert.equal(await page.locator('.traveller').evaluate(e=>getComputedStyle(e).display),'none',file);
+    assert.equal(await page.locator('.resting-signal').evaluate(e=>getComputedStyle(e).display),'block',file);
+  }
   await page.emulateMedia({reducedMotion:'no-preference'});
 });
+// Copies the planet canvas into a 2D canvas so the check works for any renderer.
+const planetPixels=(points)=>page.locator('#planet').evaluate((c,points)=>{
+  const copy=document.createElement('canvas');copy.width=c.width;copy.height=c.height;
+  const ctx=copy.getContext('2d');ctx.drawImage(c,0,0);
+  return points.map(([x,y])=>[...ctx.getImageData(x,y,1,1).data]);
+},points);
+const sphereRow=[];for(let x=120;x<=780;x+=4)sphereRow.push([x,450],[x,320]);
+const differing=(a,b)=>a.filter((px,i)=>px.some((v,k)=>Math.abs(v-b[i][k])>2)).length;
 test('planet hides rear rings and retains an opaque unlit hemisphere',async()=>{
   await open('title_card.html');
-  const alpha=await page.locator('#planet').evaluate(c=>{
-    const ctx=c.getContext('2d');
-    return [ctx.getImageData(450,450,1,1).data[3],ctx.getImageData(560,540,1,1).data[3],ctx.getImageData(0,0,1,1).data[3]];
-  });
+  const alpha=(await planetPixels([[450,450],[560,540],[0,0]])).map(px=>px[3]);
   assert.deepEqual(alpha,[255,255,0]);
+});
+test('planet surface turns over time and is deterministic when frozen',async()=>{
+  await open('title_card.html',1920,1080,'?t=0');
+  const start=await planetPixels(sphereRow);
+  await open('title_card.html',1920,1080,'?t=75');
+  const half=await planetPixels(sphereRow);
+  assert.ok(differing(start,half)>sphereRow.length/4,'only '+differing(start,half)+' pixels changed after half a revolution');
+  await open('outro_card.html',1920,1080,'?t=75');
+  assert.equal(differing(half,await planetPixels(sphereRow)),0,'the same frozen time renders differently');
+  await open('title_card.html');
+  const live=await planetPixels(sphereRow);
+  await page.waitForTimeout(400);
+  assert.ok(differing(live,await planetPixels(sphereRow))>0,'the live planet does not move');
+});
+test('reduced motion keeps the planet still',async()=>{
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await open('outro_card.html');
+  const first=await planetPixels(sphereRow);
+  await page.waitForTimeout(400);
+  assert.equal(differing(first,await planetPixels(sphereRow)),0);
+  await page.emulateMedia({reducedMotion:'no-preference'});
 });
 test('all twelve scenes preview with the actual components and no remote connections',async()=>{
   await page.setViewportSize({width:2100,height:1300});
