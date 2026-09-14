@@ -15,11 +15,12 @@ Please don't substitute another browser, even a Chromium-based one:
 Chirag will send you a link that looks like this:
 
 ```
-https://vdo.ninja/?room=ROOM&push=YOUR-ID&password=PW&record=6000
+https://vdo.ninja/?room=ROOM&push=guestXXXXXXXX&password=PW&record=6000
 ```
 
-Don't edit it. The `push=YOUR-ID` part is how the studio finds your camera — if
-it changes, you appear as a black box with no error shown.
+Don't edit it, and don't retype it — copy and paste. The `push=` part is how
+the studio finds your camera. If even one character differs, you appear as a
+black box and **nothing reports an error** on either end.
 
 ## Before we start
 
