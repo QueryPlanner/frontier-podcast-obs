@@ -6,6 +6,7 @@
 
 # Generated links. Each one embeds the room name and password in plaintext.
 guest_link.txt
+parth_link.txt
 director_link.txt
 view_link.txt
 
@@ -23,5 +24,6 @@ render/
 *.webm
 
 __pycache__/
+node_modules/
 *.pyc
 .DS_Store

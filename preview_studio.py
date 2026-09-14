@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""Build a local, credential-free preview from the actual OBS scene geometry."""
+import json
+from pathlib import Path
+
+from build_scenes import build, CARRIER
+
+
+def preview_data():
+    collection = build("previewroom", "previewguest", parth_id="previewparth")
+    sources = {source["name"]: source for source in collection["sources"]}
+    result = []
+    for entry in collection["scene_order"]:
+        scene = sources[entry["name"]]
+        items = []
+        for item in scene["settings"]["items"]:
+            if item["private_settings"].get("frontier_role") == CARRIER:
+                continue
+            source = sources[item["name"]]
+            record = dict(name=item["name"], x=item["pos"]["x"], y=item["pos"]["y"],
+                          w=item["bounds"]["x"], h=item["bounds"]["y"])
+            if source["id"] == "browser_source" and "vdo.ninja" not in source["settings"]["url"]:
+                url = source["settings"]["url"]
+                # Keep the preview relocatable with the assets beside it.
+                record["url"] = "../assets/" + url.split("/assets/", 1)[1]
+            elif source["id"] == "color_source_v3":
+                color = source["settings"]["color"]
+                record["color"] = f"rgb({color & 255},{(color >> 8) & 255},{(color >> 16) & 255})"
+            items.append(record)
+        result.append(dict(name=scene["name"], items=items))
+    return result
+
+
+def render():
+    template = Path(__file__).with_name("preview_template.html").read_text()
+    output = Path(__file__).with_name("render")
+    output.mkdir(exist_ok=True)
+    path = output / "studio-preview.html"
+    path.write_text(template.replace("__SCENE_DATA__", json.dumps(preview_data())))
+    return path
+
+
+if __name__ == "__main__":
+    print(render())

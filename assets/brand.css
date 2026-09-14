@@ -1,0 +1,65 @@
+@font-face { font-family:"Anybody"; src:url("fonts/Anybody.ttf") format("truetype"); font-weight:100 900; font-stretch:50% 150%; font-display:swap; }
+@font-face { font-family:"Dela Gothic One"; src:url("fonts/DelaGothicOne.ttf") format("truetype"); font-weight:400; font-display:swap; }
+@font-face { font-family:"Fragment Mono"; src:url("fonts/FragmentMono.ttf") format("truetype"); font-weight:400; font-display:swap; }
+:root {
+  --void:#07080D; --bone:#F2EBDD; --spectral:#8B7CFF; --orbital:#FF9D62;
+  --deep:#162752; --muted:#B8B3B0; --rule:#F2EBDD26;
+  --brand:"Anybody",sans-serif; --display:"Dela Gothic One",sans-serif;
+  --mono:"Fragment Mono",monospace;
+}
+* { box-sizing:border-box; }
+html,body { margin:0; width:100%; height:100%; overflow:hidden; }
+body { background:transparent; color:var(--bone); font-family:var(--brand); font-variation-settings:"wdth" 110,"wght" 400; }
+h1,h2,p { margin:0; }
+.mono { font:14px/1.5 var(--mono); letter-spacing:.09em; text-transform:uppercase; }
+.muted { color:var(--muted); }
+.spectral { color:var(--spectral); }
+.heat { color:var(--orbital); }
+.dot { display:inline-block; width:7px; height:7px; margin-right:12px; border-radius:50%; background:var(--orbital); }
+.frame { position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--void); }
+.space { background:radial-gradient(ellipse at 73% 43%,#16275280,transparent 58%),var(--void); }
+.stars { position:absolute; inset:-32px; pointer-events:none; background-image:radial-gradient(circle at 16% 22%,#F2EBDDA0 0 1px,transparent 1.5px),radial-gradient(circle at 74% 15%,#8B7CFFAA 0 1px,transparent 1.5px),radial-gradient(circle at 72% 84%,#F2EBDD90 0 1px,transparent 1.5px),radial-gradient(circle at 34% 69%,#F2EBDD60 0 1px,transparent 1.5px),radial-gradient(circle at 89% 58%,#F2EBDD77 0 1px,transparent 1.5px); background-size:690px 590px; animation:drift 40s ease-in-out infinite alternate; }
+.planet { position:absolute; width:830px; height:830px; right:-60px; top:135px; }
+.page-edge { position:absolute; inset:38px 48px auto; height:60px; display:flex; align-items:center; justify-content:space-between; gap:30px; border-bottom:1px solid var(--rule); }
+.page-edge .mini-mark { font:28px/1 var(--display); letter-spacing:-.06em; }
+.page-footer { position:absolute; left:48px; right:48px; bottom:42px; display:flex; justify-content:space-between; align-items:center; gap:36px; border-top:1px solid var(--rule); padding-top:28px; }
+.host-identity { display:flex; align-items:center; gap:20px; }
+.host-identity h2 { font-size:25px; font-variation-settings:"wdth" 112,"wght" 600; }
+.host-identity .website { font:14px/1.8 var(--mono); color:var(--muted); }
+.brand-lines { border-left:1px solid var(--rule); padding-left:24px; font-size:20px; }
+.bev-logo { width:72px; height:72px; object-fit:contain; }
+.topbar { width:1920px; height:96px; padding:0 48px; display:flex; align-items:center; justify-content:space-between; gap:32px; }
+.topbar .brand { display:flex; align-items:center; gap:30px; }
+.topbar .mark { font:34px/1 var(--display); letter-spacing:-.07em; }
+.topbar .show-name { font-size:25px; font-variation-settings:"wdth" 118,"wght" 550; letter-spacing:-.02em; }
+.topbar .details { display:flex; align-items:center; gap:32px; }
+.topbar .details > * + * { border-left:1px solid var(--rule); padding-left:32px; }
+.lower { width:1920px; height:196px; padding:0 48px 24px; }
+.lower-grid { display:grid; grid-template-columns:168px minmax(0,1fr) 385px 345px; height:100%; gap:28px; align-items:center; border-top:1px solid var(--rule); }
+.lower-logo { width:165px; }
+.lower .episode-title { font-size:36px; line-height:1.25; font-variation-settings:"wdth" 110,"wght" 570; letter-spacing:-.035em; max-height:92px; }
+.lower .episode-meta { margin-bottom:12px; font-size:12px; }
+.lower .person { border-left:1px solid var(--rule); padding-left:28px; min-height:96px; display:flex; flex-direction:column; justify-content:center; gap:9px; }
+.lower .person:last-child { flex-direction:row; align-items:center; justify-content:space-between; }
+.lower .person .website { font:13px/1.4 var(--mono); color:var(--muted); }
+.lower .person .brands { font-size:19px; font-variation-settings:"wdth" 100,"wght" 550; }
+.lower .person .mono { font-size:12px; }
+.lower .person .bev-logo { width:76px; height:76px; }
+.card-content { position:absolute; left:90px; top:185px; width:1060px; }
+.card-content .orbital-logo { width:1000px; height:auto; display:block; margin:0 0 4px -38px; }
+.card-content .show-name { font-size:59px; line-height:1.05; font-variation-settings:"wdth" 135,"wght" 650; letter-spacing:-.045em; }
+.card-content .status { margin-top:45px; font-size:16px; }
+.card-content .hosts { font-size:28px; margin-top:24px; color:var(--muted); }
+.card-content .tagline { margin-top:24px; width:700px; font-size:23px; line-height:1.7; }
+.outro-content { position:absolute; left:90px; top:245px; width:1100px; }
+.outro-content .outro-title { font-size:128px; line-height:.98; letter-spacing:-.055em; font-variation-settings:"wdth" 118,"wght" 720; margin:36px 0; }
+.outro-content .outro-copy { width:730px; font-size:27px; line-height:1.65; color:var(--muted); }
+.outro-content .outro-logo { width:340px; margin-top:42px; }
+.label { display:flex; width:100%; height:100%; gap:16px; align-items:center; border-left:3px solid var(--spectral); padding:8px 14px; background:linear-gradient(90deg,#07080DF5,#07080DB8 78%,#07080D00); }
+.label[data-person="parth"] { border-left-color:var(--orbital); }
+.label .name { font-size:25px; line-height:1.2; font-variation-settings:"wdth" 110,"wght" 650; white-space:nowrap; }
+.label .website { font:11px/1.5 var(--mono); color:var(--muted); }
+.label .role { margin-left:auto; font:10px/1.4 var(--mono); text-transform:uppercase; letter-spacing:.08em; max-width:120px; }
+@media(max-width:500px) { .label .name { font-size:22px; } .label .role { display:none; } }
+@keyframes drift { from { transform:translate3d(-10px,5px,0); } to { transform:translate3d(10px,-5px,0); } }
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; } .traveller { display:none; } .resting-signal { display:block!important; } }

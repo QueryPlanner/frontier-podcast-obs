@@ -15,10 +15,16 @@ REC_DIR="$HOME/Movies"
 
 # Track numbers here are OBS's 1-based labels, matching the checkboxes in
 # Settings > Output > Recording. ffmpeg indexes audio streams from 0, so the
-# mapping is track N -> stream a:N-1. Track 6 is not stream 5: OBS only writes
-# the tracks you ticked, so with 1,2,3,6 enabled the file holds four streams
-# and track 6 lands at a:3. That is why this reads positionally.
-EXPECTED=("MIC — Me" "CAM — Guest" "SCREEN — Guest Share" "MIX — Safety")
+# mapping is track N -> stream a:N-1 with all six tracks enabled. Reject a
+# different track count before applying these positional labels.
+EXPECTED=("Chirag mic" "Guest voice" "Guest screen audio" "Parth voice" "Parth screen audio" "Safety mix")
+REQUIRED=(1 0 0 1 0 1)
+
+# Guests and screen audio are optional in the default duo format.
+if [ "${1:-}" = "--guest" ]; then
+  REQUIRED[1]=1
+  shift
+fi
 
 # A track carrying speech sits well above this. A track carrying nothing
 # reports -91 dB (the noise floor of 16-bit silence) or literally -inf.
@@ -37,9 +43,9 @@ fi
 NTRACKS=$(ffprobe -v error -select_streams a -show_entries stream=index \
             -of csv=p=0 "$FILE" | wc -l | tr -d ' ')
 echo "audio tracks found: $NTRACKS"
-if [ "$NTRACKS" -ne 4 ]; then
-  echo "  WARNING: expected 4 (tracks 1, 2, 3, 6). Check that all four boxes"
-  echo "  are ticked in Settings > Output > Recording."
+if [ "$NTRACKS" -ne 6 ]; then
+  echo "ERROR: expected six tracks. Enable all six recording tracks in OBS."
+  exit 1
 fi
 echo
 
@@ -63,8 +69,12 @@ for ((i = 0; i < NTRACKS; i++)); do
 
   # -inf compares as neither < nor > in awk, so test it explicitly first.
   if [ "$PEAK" = "-inf" ] || awk "BEGIN{exit !($PEAK < $SILENCE_DB)}"; then
-    STATUS="SILENT  <-- nothing recorded on this track"
-    FAILED=1
+    if [ "${REQUIRED[$i]}" -eq 1 ]; then
+      STATUS="SILENT: required voice or mix is missing"
+      FAILED=1
+    else
+      STATUS="idle: optional guest or screen audio"
+    fi
   else
     STATUS="ok"
   fi
@@ -74,10 +84,9 @@ done
 
 echo
 if [ "$FAILED" -eq 0 ]; then
-  echo "All tracks carry audio."
+  echo "All required tracks carry audio."
 else
-  echo "At least one track is empty. If it is 'CAM — Guest', reroute_audio is"
-  echo "not delivering the WebRTC stream -- that is the unverified assumption"
-  echo "in this setup, and track 6 is your fallback for the episode."
+  echo "A required track is empty. Check the named mic or remote feed in OBS."
+  echo "Track 6 is the safety mix; remote microphones must use reroute_audio."
   exit 1
 fi
