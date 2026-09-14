@@ -354,7 +354,8 @@ def build(room, guest_id, password=None, *, parth_id=None, chirag_id=None,
     c.browser("CARD · Break", "title_card.html", CANVAS_W, CANVAS_H,
               status="Back shortly", **common, **identity)
     c.browser("CARD · Outro", "outro_card.html", CANVAS_W, CANVAS_H,
-              thanks="Stay curious.", **common, **identity)
+              thanks="Stay curious.", **common,
+              chiragSite=identity["chiragSite"], parthSite=identity["parthSite"])
     c.source("color_source_v3", "UI · Cell Border",
              {"color": SPECTRAL, "width": CANVAS_W, "height": CANVAS_H})
     c.source("color_source_v3", "BG · Void",

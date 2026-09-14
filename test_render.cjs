@@ -51,12 +51,20 @@ test('full-frame cards and background remain opaque',async()=>{
     for(let i=3;i<im.data.length;i+=4)assert.equal(im.data[i],255);
   }
 });
-test('both host websites and the supplied Bev image are visible',async()=>{
+test('brands share a strip separate from host identities and websites',async()=>{
   for(const file of ['lower_stack.html','title_card.html','outro_card.html']){
     await open(file,1920,file==='lower_stack.html'?196:1080);
     for(const text of ['lordpatil.com','parthshastri.co.in','Lord Socks','House of Lords'])assert.ok((await page.locator('body').innerText()).includes(text));
     assert.equal(await page.locator('img[alt="Bev."]').count(),1);
     assert.ok(!(await page.locator('body').innerText()).includes('Bev.'));
+    const strip=page.locator('.brand-strip');
+    assert.equal(await strip.count(),1);
+    assert.equal(await strip.locator('img[alt="Bev."]').count(),1);
+    assert.match(await strip.innerText(),/Lord Socks/);
+    assert.match(await strip.innerText(),/House of Lords/);
+    assert.doesNotMatch(await strip.innerText(),/Chirag|Parth|lordpatil|parthshastri/);
+    assert.equal(await page.locator('.host-identity .brand-strip, .host-identity .bev-logo').count(),0);
+    assert.ok(await strip.evaluate(e=>e.scrollWidth<=e.clientWidth));
   }
 });
 test('episode overrides and long text fit without injected markup',async()=>{

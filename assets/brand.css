@@ -23,10 +23,12 @@ h1,h2,p { margin:0; }
 .page-edge { position:absolute; inset:38px 48px auto; height:60px; display:flex; align-items:center; justify-content:space-between; gap:30px; border-bottom:1px solid var(--rule); }
 .page-edge .mini-mark { font:28px/1 var(--display); letter-spacing:-.06em; }
 .page-footer { position:absolute; left:48px; right:48px; bottom:42px; display:flex; justify-content:space-between; align-items:center; gap:36px; border-top:1px solid var(--rule); padding-top:28px; }
-.host-identity { display:flex; align-items:center; gap:20px; }
+.host-identity { display:flex; align-items:center; gap:64px; }
 .host-identity h2 { font-size:25px; font-variation-settings:"wdth" 112,"wght" 600; }
 .host-identity .website { font:14px/1.8 var(--mono); color:var(--muted); }
-.brand-lines { border-left:1px solid var(--rule); padding-left:24px; font-size:20px; }
+.brand-strip { display:flex; align-items:center; justify-content:space-between; gap:32px; border-left:1px solid var(--rule); padding-left:36px; }
+.brand-item { white-space:nowrap; font-size:21px; font-variation-settings:"wdth" 110,"wght" 550; }
+.page-footer .brand-strip { width:620px; }
 .bev-logo { width:72px; height:72px; object-fit:contain; }
 .topbar { width:1920px; height:96px; padding:0 48px; display:flex; align-items:center; justify-content:space-between; gap:32px; }
 .topbar .brand { display:flex; align-items:center; gap:30px; }
@@ -35,16 +37,14 @@ h1,h2,p { margin:0; }
 .topbar .details { display:flex; align-items:center; gap:32px; }
 .topbar .details > * + * { border-left:1px solid var(--rule); padding-left:32px; }
 .lower { width:1920px; height:196px; padding:0 48px 24px; }
-.lower-grid { display:grid; grid-template-columns:168px minmax(0,1fr) 385px 345px; height:100%; gap:28px; align-items:center; border-top:1px solid var(--rule); }
+.lower-grid { display:grid; grid-template-columns:168px minmax(0,1fr) 560px; height:100%; gap:28px; align-items:center; border-top:1px solid var(--rule); }
 .lower-logo { width:165px; }
 .lower .episode-title { font-size:36px; line-height:1.25; font-variation-settings:"wdth" 110,"wght" 570; letter-spacing:-.035em; max-height:92px; }
 .lower .episode-meta { margin-bottom:12px; font-size:12px; }
-.lower .person { border-left:1px solid var(--rule); padding-left:28px; min-height:96px; display:flex; flex-direction:column; justify-content:center; gap:9px; }
-.lower .person:last-child { flex-direction:row; align-items:center; justify-content:space-between; }
-.lower .person .website { font:13px/1.4 var(--mono); color:var(--muted); }
-.lower .person .brands { font-size:19px; font-variation-settings:"wdth" 100,"wght" 550; }
-.lower .person .mono { font-size:12px; }
-.lower .person .bev-logo { width:76px; height:76px; }
+.lower .host-sites { display:flex; gap:24px; margin-top:12px; font:13px/1.4 var(--mono); color:var(--muted); }
+.lower .brand-strip { min-height:96px; padding-left:28px; gap:24px; }
+.lower .brand-item { font-size:19px; }
+.lower .bev-logo { width:76px; height:76px; }
 .card-content { position:absolute; left:90px; top:185px; width:1060px; }
 .card-content .orbital-logo { width:1000px; height:auto; display:block; margin:0 0 4px -38px; }
 .card-content .show-name { font-size:59px; line-height:1.05; font-variation-settings:"wdth" 135,"wght" 650; letter-spacing:-.045em; }

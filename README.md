@@ -10,8 +10,8 @@ The design uses the WTF brand board: Event Horizon `#07080D`, Signal Bone
 headlines and readable body copy, and Fragment Mono handles metadata.
 All three fonts are bundled locally with their licenses.
 
-Chirag’s identity shows **lordpatil.com**, **Lord Socks** and **House of Lords**.
-Parth’s identity shows **parthshastri.co.in** and the supplied **Bev. SVG logo**.
+Host identities show **lordpatil.com** for Chirag and **parthshastri.co.in** for Parth.
+**Lord Socks**, **House of Lords** and the supplied **Bev. SVG logo** appear together in a shared brand strip, separate from either host.
 The Bev. artwork is preserved without redrawing or substituting typed text.
 
 ## Preview the studio
@@ -39,7 +39,7 @@ the menu or use F1 through F12.
 | F7 | 07 Trio · With Guest | Chirag, Parth and the guest side by side |
 | F8 | 08 Screen · Trio | Large shared content with all three participants |
 | F9 | 09 Duo · Vertical | Stacked host cameras spanning the vertical safe zone |
-| F10 | 10 Outro | Closing card with both hosts and their brands |
+| F10 | 10 Outro | Closing card with both hosts and the shared brand strip |
 | F11 | 11 Solo · Guest | Guest camera |
 | F12 | 12 Break | Animated standby card reading “Back shortly” |
 
