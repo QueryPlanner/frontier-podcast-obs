@@ -1,25 +1,57 @@
 (() => {
   const params = new URLSearchParams(location.search);
-  const fontConfig = window.WTF_FONT_CONFIG || {defaultVariant: "current", variants: {}};
-  const defaultFont = fontConfig.variants[fontConfig.defaultVariant] || {};
-  const requestedFont = params.get("font");
-  const fontName = requestedFont && fontConfig.variants[requestedFont]
-    ? requestedFont : fontConfig.defaultVariant;
-  const fontVariant = fontConfig.variants[fontName] || defaultFont;
-  const fontRoles = {...(defaultFont.roles || {}), ...(fontVariant.roles || {})};
+  const fontConfig = window.WTF_FONT_CONFIG || {default: {roles: {}}};
+  const defaultRoles = fontConfig.default?.roles || {};
+  const fontRoles = {...defaultRoles};
   const roleVariables = {brand: "--brand", display: "--display", mono: "--mono"};
-  document.documentElement.dataset.fontVariant = fontName;
+
+  function googleFont(link) {
+    if (!link || typeof link !== "string") return null;
+    try {
+      const url = new URL(link.trim());
+      if (url.protocol !== "https:") return null;
+      let family = "";
+      let stylesheet = "";
+      if (url.hostname === "fonts.googleapis.com" && url.pathname === "/css2") {
+        family = url.searchParams.get("family") || "";
+        stylesheet = url.href;
+      } else if (url.hostname === "fonts.google.com" && url.pathname.startsWith("/specimen/")) {
+        family = decodeURIComponent(url.pathname.slice("/specimen/".length)).replace(/\+/g, " ");
+      } else if (url.hostname === "fonts.google.com" && url.pathname === "/share") {
+        family = url.searchParams.get("selection.family") || "";
+      } else return null;
+      family = family.split("|")[0].split(":")[0].replace(/\+/g, " ").trim();
+      if (!family || !/^[A-Za-z0-9 .'-]+$/.test(family)) return null;
+      if (!stylesheet) {
+        const encoded = encodeURIComponent(family).replace(/%20/g, "+");
+        stylesheet = `https://fonts.googleapis.com/css2?family=${encoded}&display=swap`;
+      }
+      return {family, stylesheet};
+    } catch (_) {
+      return null;
+    }
+  }
+
+  const selectedFont = googleFont(fontConfig.googleFontsUrl);
+  const selectedRole = roleVariables[fontConfig.googleFontRole]
+    ? fontConfig.googleFontRole : "brand";
+  if (selectedFont) {
+    const fallback = defaultRoles[selectedRole] || "sans-serif";
+    fontRoles[selectedRole] = `"${selectedFont.family}", ${fallback}`;
+  }
+  document.documentElement.dataset.fontVariant = selectedFont ? "google-fonts" : "current";
+  if (selectedFont) document.documentElement.dataset.fontFamily = selectedFont.family;
   Object.entries(fontRoles).forEach(([role, stack]) => {
     if (roleVariables[role] && typeof stack === "string")
       document.documentElement.style.setProperty(roleVariables[role], stack);
   });
   let stylesheetReady = Promise.resolve();
-  if (fontVariant.stylesheet) {
+  if (selectedFont) {
     stylesheetReady = new Promise(resolve => {
       const link = document.createElement("link");
       link.rel = "stylesheet";
-      link.href = fontVariant.stylesheet;
-      link.dataset.fontVariant = fontName;
+      link.href = selectedFont.stylesheet;
+      link.dataset.googleFont = selectedFont.family;
       link.addEventListener("load", resolve, {once: true});
       link.addEventListener("error", resolve, {once: true});
       document.head.append(link);

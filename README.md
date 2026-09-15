@@ -27,19 +27,17 @@ shared-content placeholders are illustrative. It never opens cameras,
 microphones or remote feeds, and it needs no credentials. Choose a scene from
 the menu or use F1 through F12.
 
-Typography variants live in `assets/font-config.js`. The default `current`
-variant uses the bundled fonts and needs no network. A Cormorant Garamond trial
-is included without making it the default:
+Typography lives in `assets/font-config.js`. The default uses the bundled fonts
+and needs no network. To try a Google Font, paste its specimen/share link or its
+`fonts.googleapis.com` CSS link into `googleFontsUrl`:
 
-```bash
-python3 preview_studio.py --font cormorant-garamond
+```js
+googleFontsUrl: "https://fonts.google.com/specimen/Cormorant+Garamond",
 ```
 
-Open `render/studio-preview.html` after generating it. To add another trial,
-add one entry to `WTF_FONT_CONFIG.variants` with a stylesheet URL and whichever
-of the `brand`, `display` or `mono` roles it should override. A failed remote
-font request falls back to the current local fonts. Pass the same `--font`
-option to `build_scenes.py` when generating the OBS collection.
+Set `googleFontRole` to `brand`, `display` or `mono`, then regenerate the preview
+normally. Clear `googleFontsUrl` to restore the current typography. A malformed
+link or failed remote request falls back to the current local fonts.
 
 ## Scenes
 

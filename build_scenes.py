@@ -303,8 +303,7 @@ def guest_link(room, guest_id, password=None, record_kbps=6000):
 def build(room, guest_id, password=None, *, parth_id=None, chirag_id=None,
           local_host="chirag",
           episode="01", title="Conversations at the edge of possible",
-          guest_name="Guest", guest_role="In conversation",
-          font_variant=None):
+          guest_name="Guest", guest_role="In conversation"):
     if local_host not in ("chirag", "parth"):
         raise ValueError("local_host must be chirag or parth")
     remote_host = "parth" if local_host == "chirag" else "chirag"
@@ -323,7 +322,6 @@ def build(room, guest_id, password=None, *, parth_id=None, chirag_id=None,
 
     show = "what’s the frontier"
     hosts = "Chirag & Parth"
-    font_query = {"font": font_variant} if font_variant else {}
     common = dict(show=show, episode=episode)
     identity = dict(hosts=hosts, chiragSite="lordpatil.com",
                     parthSite="parthshastri.co.in")
@@ -347,20 +345,17 @@ def build(room, guest_id, password=None, *, parth_id=None, chirag_id=None,
                  vdo_url(view=f"{sid}:s", videobitrate=3500, **view),
                  audio_tracks=share | TRACK_6)
 
-    c.browser("BG · Starfield", "starfield_bg.html", CANVAS_W, CANVAS_H,
-              **font_query)
-    c.browser("UI · Top Bar", "topbar.html", CANVAS_W, TOPBAR_H,
-              **common, **font_query)
+    c.browser("BG · Starfield", "starfield_bg.html", CANVAS_W, CANVAS_H)
+    c.browser("UI · Top Bar", "topbar.html", CANVAS_W, TOPBAR_H, **common)
     c.browser("UI · Lower Stack", "lower_stack.html", CANVAS_W, LOWER_H,
-              title=title, **identity, episode=episode, **font_query)
+              title=title, **identity, episode=episode)
     c.browser("CARD · Title", "title_card.html", CANVAS_W, CANVAS_H,
-              status="Starting soon", **common, **identity, **font_query)
+              status="Starting soon", **common, **identity)
     c.browser("CARD · Break", "title_card.html", CANVAS_W, CANVAS_H,
-              status="Back shortly", **common, **identity, **font_query)
+              status="Back shortly", **common, **identity)
     c.browser("CARD · Outro", "outro_card.html", CANVAS_W, CANVAS_H,
               thanks="Stay curious.", **common,
-              chiragSite=identity["chiragSite"], parthSite=identity["parthSite"],
-              **font_query)
+              chiragSite=identity["chiragSite"], parthSite=identity["parthSite"])
     c.source("color_source_v3", "UI · Cell Border",
              {"color": SPECTRAL, "width": CANVAS_W, "height": CANVAS_H})
     c.source("color_source_v3", "BG · Void",
@@ -399,8 +394,7 @@ def build(room, guest_id, password=None, *, parth_id=None, chirag_id=None,
         if label not in c.by_name:
             name, role, website = people[person]
             c.browser(label, "participant_label.html", lw, lh,
-                      name=name, role=role, website=website,
-                      person=person.lower(), **font_query)
+                      name=name, role=role, website=website, person=person.lower())
         return [c.item(label, x + 16, y + h - lh - 16, lw, lh)] + c.cell(
             f"CAM · {person}", x, y, w, h)
 
@@ -507,8 +501,6 @@ if __name__ == "__main__":
     ap.add_argument("--title", default="Conversations at the edge of possible")
     ap.add_argument("--guest-name", default="Guest")
     ap.add_argument("--guest-role", default="In conversation")
-    ap.add_argument("--font", dest="font_variant",
-                    help="font variant key from assets/font-config.js")
     args = ap.parse_args()
     room = os.environ.get("VDO_ROOM")
     guest = os.environ.get("VDO_GUEST_ID")
@@ -536,8 +528,7 @@ if __name__ == "__main__":
             collections = [(host, build(
                 room, guest, password, parth_id=parth, chirag_id=chirag,
                 local_host=host, episode=args.episode, title=args.title,
-                guest_name=args.guest_name, guest_role=args.guest_role,
-                font_variant=args.font_variant))
+                guest_name=args.guest_name, guest_role=args.guest_role))
                 for host in local_hosts]
             output = Path(args.output)
             for host, result in collections:

@@ -1,23 +1,19 @@
-// Typography variants for every browser overlay.
-//
-// `current` is deliberately local-only and remains the default. To try another
-// font, add a named entry with its stylesheet URL and the CSS font roles it
-// should override, then pass that name as ?font=<name> or --font <name>.
-window.WTF_FONT_CONFIG = {
-  defaultVariant: "current",
-  variants: {
-    current: {
-      roles: {
-        brand: '"Anybody", sans-serif',
-        display: '"Dela Gothic One", sans-serif',
-        mono: '"Fragment Mono", monospace',
-      },
-    },
-    "cormorant-garamond": {
-      stylesheet: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap",
-      roles: {
-        brand: '"Cormorant Garamond", "Anybody", serif',
-      },
+// Typography for every browser overlay. The bundled fonts below are always the
+// fallback and need no network connection.
+window.WTF_FONT_CONFIG ||= {
+  default: {
+    roles: {
+      brand: '"Anybody", sans-serif',
+      display: '"Dela Gothic One", sans-serif',
+      mono: '"Fragment Mono", monospace',
     },
   },
+
+  // Paste a Google Fonts specimen/share URL or a fonts.googleapis.com CSS URL.
+  // Example: "https://fonts.google.com/specimen/Cormorant+Garamond"
+  // Leave empty to keep the current local typography.
+  googleFontsUrl: "",
+
+  // Which typography role the pasted font replaces: brand, display or mono.
+  googleFontRole: "brand",
 };
