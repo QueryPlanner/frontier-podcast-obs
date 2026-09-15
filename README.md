@@ -174,6 +174,50 @@ still needs to be selected in OBS. Verify all six recording tracks are checked.
 The redesign itself does not import a collection or modify your running OBS
 configuration. Those installation steps are explicit.
 
+## Change an episode or studio setting
+
+There is no automatic sync from this repository into OBS. `build_scenes.py`
+writes scene-collection JSON files; after a setting changes the files must be
+imported again with **Scene Collection → Import**. OBS also does not watch the
+generated JSON files for changes.
+
+For a new episode, load `.env`, then generate both choices for the local
+operator. `--both-local-hosts` means one collection with Chirag local and a
+second collection with Parth local; it does not make both hosts local at once.
+
+```bash
+set -a
+. ./.env
+set +a
+
+python3 build_scenes.py \
+  --both-local-hosts \
+  --episode 02 \
+  --title "The new episode title" \
+  --guest-name "Guest Name" \
+  --guest-role "Guest role"
+```
+
+Import the regenerated `podcast_scenes_chirag_local.json` and
+`podcast_scenes_parth_local.json`, then select the collection matching the
+person operating OBS. Hardware sources may need to be selected again after a
+fresh import.
+
+Use the following rule to determine whether a rebuild is required:
+
+| Setting | Change it in | How to apply it in OBS |
+| --- | --- | --- |
+| Episode number and title | `--episode` and `--title` | Rebuild and import the collections again |
+| Guest name and role | `--guest-name` and `--guest-role` | Rebuild and import the collections again |
+| VDO room, participant IDs and password | `.env` | Rebuild and import the collections again |
+| Scene layout and source geometry | `build_scenes.py` | Rebuild and import the collections again |
+| Google Font and font role | `assets/font-config.js` | Refresh each Browser Source or restart OBS; no rebuild |
+| Sponsor names, artwork and motion | Browser assets in `assets/` | Refresh each Browser Source or restart OBS; no rebuild |
+| Recording resolution, encoder and tracks | OBS settings or `apply_profile.sh` | Quit OBS before running the profile helper |
+
+Run `python3 preview_studio.py` and open `render/studio-preview.html` to check
+copy, fonts and layouts before importing or refreshing OBS.
+
 ## Recording tracks
 
 | Track | Audio |
