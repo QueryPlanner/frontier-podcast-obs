@@ -35,9 +35,29 @@ and needs no network. To try a Google Font, paste its specimen/share link or its
 googleFontsUrl: "https://fonts.google.com/specimen/Cormorant+Garamond",
 ```
 
-Set `googleFontRole` to `brand`, `display` or `mono`, then regenerate the preview
-normally. Clear `googleFontsUrl` to restore the current typography. A malformed
-link or failed remote request falls back to the current local fonts.
+Set `googleFontRole` to one of the following values. One pasted font replaces
+one role at a time; the other roles continue using their bundled defaults.
+
+| Role | Used for |
+| --- | --- |
+| `brand` | Headlines, episode and show titles, participant names, sponsor names and body copy |
+| `display` | Small textual WTF marks in the top bar and cards |
+| `mono` | Episode metadata, status, clock, websites, participant roles and small labels |
+
+The orbital WTF logo is SVG artwork and is not changed by any font role. If a
+Google Fonts link contains several families, the first family is used.
+
+Generate and open the preview after changing the config:
+
+```bash
+python3 preview_studio.py
+open render/studio-preview.html
+```
+
+Remote fonts need internet access when the OBS browser source loads them. After
+changing the link, use **Refresh cache of current page** on the browser sources
+or restart OBS. Clear `googleFontsUrl` to restore the current typography. A
+malformed link or failed remote request falls back to the current local fonts.
 
 ## Scenes
 
