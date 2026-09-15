@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Build a local, credential-free preview from the actual OBS scene geometry."""
+import argparse
 import json
 from pathlib import Path
 
 from build_scenes import build, CARRIER
 
 
-def preview_data(local_host="chirag"):
+def preview_data(local_host="chirag", font_variant=None):
     collection = build("previewroom", "previewguest", parth_id="previewparth",
-                       chirag_id="previewchirag", local_host=local_host)
+                       chirag_id="previewchirag", local_host=local_host,
+                       font_variant=font_variant)
     sources = {source["name"]: source for source in collection["sources"]}
     result = []
     for entry in collection["scene_order"]:
@@ -34,15 +36,20 @@ def preview_data(local_host="chirag"):
     return result
 
 
-def render():
+def render(font_variant=None):
     template = Path(__file__).with_name("preview_template.html").read_text()
     output = Path(__file__).with_name("render")
     output.mkdir(exist_ok=True)
     path = output / "studio-preview.html"
-    choices = {host: preview_data(host) for host in ("chirag", "parth")}
+    choices = {host: preview_data(host, font_variant)
+               for host in ("chirag", "parth")}
     path.write_text(template.replace("__COLLECTION_DATA__", json.dumps(choices)))
     return path
 
 
 if __name__ == "__main__":
-    print(render())
+    parser = argparse.ArgumentParser(description="Preview the WTF OBS studio.")
+    parser.add_argument("--font", dest="font_variant",
+                        help="font variant key from assets/font-config.js")
+    args = parser.parse_args()
+    print(render(args.font_variant))

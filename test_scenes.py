@@ -749,6 +749,30 @@ class TestDuoStudio(unittest.TestCase):
             self.assertGreater(os.path.getsize(font), 1000)
             self.assertTrue(os.path.isfile(os.path.join(bs.ASSETS, "fonts", family + "-OFL.txt")))
 
+    def test_font_variant_reaches_every_local_browser_overlay(self):
+        col = build(ROOM, GUEST_ID, PASSWORD, parth_id=PARTH_ID,
+                    font_variant="cormorant-garamond")
+        local_browsers = [s for s in col["sources"]
+                          if s["id"] == "browser_source"
+                          and s["settings"]["url"].startswith("file://")]
+        self.assertTrue(local_browsers)
+        for source in local_browsers:
+            query = parse_qs(urlparse(source["settings"]["url"]).query)
+            self.assertEqual(query["font"], ["cormorant-garamond"], source["name"])
+
+    def test_default_font_variant_stays_in_shared_config(self):
+        with open(os.path.join(bs.ASSETS, "font-config.js")) as f:
+            config = f.read()
+        self.assertIn('defaultVariant: "current"', config)
+        self.assertIn('"Cormorant Garamond"', config)
+        for asset in ("topbar.html", "lower_stack.html", "title_card.html",
+                      "outro_card.html", "participant_label.html",
+                      "starfield_bg.html"):
+            with open(os.path.join(bs.ASSETS, asset)) as f:
+                html = f.read()
+            self.assertLess(html.index('src="font-config.js"'),
+                            html.index('src="brand.js"'), asset)
+
 
 class TestLocalHostSelection(unittest.TestCase):
     def variants(self):

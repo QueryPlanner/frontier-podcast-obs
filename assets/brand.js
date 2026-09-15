@@ -1,5 +1,33 @@
 (() => {
   const params = new URLSearchParams(location.search);
+  const fontConfig = window.WTF_FONT_CONFIG || {defaultVariant: "current", variants: {}};
+  const defaultFont = fontConfig.variants[fontConfig.defaultVariant] || {};
+  const requestedFont = params.get("font");
+  const fontName = requestedFont && fontConfig.variants[requestedFont]
+    ? requestedFont : fontConfig.defaultVariant;
+  const fontVariant = fontConfig.variants[fontName] || defaultFont;
+  const fontRoles = {...(defaultFont.roles || {}), ...(fontVariant.roles || {})};
+  const roleVariables = {brand: "--brand", display: "--display", mono: "--mono"};
+  document.documentElement.dataset.fontVariant = fontName;
+  Object.entries(fontRoles).forEach(([role, stack]) => {
+    if (roleVariables[role] && typeof stack === "string")
+      document.documentElement.style.setProperty(roleVariables[role], stack);
+  });
+  let stylesheetReady = Promise.resolve();
+  if (fontVariant.stylesheet) {
+    stylesheetReady = new Promise(resolve => {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = fontVariant.stylesheet;
+      link.dataset.fontVariant = fontName;
+      link.addEventListener("load", resolve, {once: true});
+      link.addEventListener("error", resolve, {once: true});
+      document.head.append(link);
+    });
+  }
+  // Consumers and tests can await the selected remote stylesheet without
+  // delaying the current local-font default.
+  window.WTF_FONTS_READY = stylesheetReady.then(() => document.fonts.ready);
   function readText(name, fallback, limit = 120) {
     const value = params.get(name);
     if (!value || !value.trim()) return fallback;
@@ -80,5 +108,5 @@
   }
   reduced.addEventListener("change", syncMotion);
   requestAnimationFrame(syncMotion);
-  document.fonts.ready.then(() => { fitCopy(); syncMotion(); });
+  window.WTF_FONTS_READY.then(() => { fitCopy(); syncMotion(); });
 })();

@@ -24,9 +24,22 @@ after(async()=>{await browser?.close()});
 async function open(file,w=1920,h=1080,query=''){
   await page.setViewportSize({width:w,height:h});
   await page.goto(pathToFileURL(path.join(assets,file)).href+query);
-  await page.evaluate(()=>document.fonts.ready);
+  await page.evaluate(()=>window.WTF_FONTS_READY||document.fonts.ready);
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
 }
+test('font variants keep the local default and load configured trials',async()=>{
+  await open('lower_stack.html',1920,196);
+  assert.equal(await page.locator('html').getAttribute('data-font-variant'),'current');
+  assert.match(await page.locator('html').evaluate(e=>e.style.getPropertyValue('--brand')),/Anybody/);
+  assert.equal(await page.locator('link[data-font-variant]').count(),0);
+  await open('lower_stack.html',1920,196,'?font=cormorant-garamond');
+  assert.equal(await page.locator('html').getAttribute('data-font-variant'),'cormorant-garamond');
+  assert.match(await page.locator('html').evaluate(e=>e.style.getPropertyValue('--brand')),/Cormorant Garamond/);
+  assert.match(await page.locator('link[data-font-variant]').getAttribute('href'),/fonts\.googleapis\.com/);
+  await open('lower_stack.html',1920,196,'?font=not-configured');
+  assert.equal(await page.locator('html').getAttribute('data-font-variant'),'current');
+  assert.equal(await page.locator('link[data-font-variant]').count(),0);
+});
 for(const [file,w,h] of [['topbar.html',1920,96],['lower_stack.html',1920,196],['title_card.html',1920,1080],['outro_card.html',1920,1080],['starfield_bg.html',1920,1080],['participant_label.html',488,64]]){
   test(file+' fits its native canvas offline',async()=>{
     await open(file,w,h);

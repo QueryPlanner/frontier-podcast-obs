@@ -8,7 +8,8 @@ The design uses the WTF brand board: Event Horizon `#07080D`, Signal Bone
 `#F2EBDD`, Spectral `#8B7CFF`, Orbital Heat `#FF9D62`, and Deep Field
 `#162752`. Dela Gothic One is reserved for the WTF mark, Anybody handles
 headlines and readable body copy, and Fragment Mono handles metadata.
-All three fonts are bundled locally with their licenses.
+All three fonts are bundled locally with their licenses. This current set is
+the default typography variant.
 
 Host identities show **lordpatil.com** for Chirag and **parthshastri.co.in** for Parth.
 **Lord Socks**, **House of Lords** and the supplied **Bev. SVG logo** rotate continuously through a compact sponsor strip at the bottom, separate from either host.
@@ -25,6 +26,20 @@ The preview uses the actual scene geometry and HTML overlays. Its camera and
 shared-content placeholders are illustrative. It never opens cameras,
 microphones or remote feeds, and it needs no credentials. Choose a scene from
 the menu or use F1 through F12.
+
+Typography variants live in `assets/font-config.js`. The default `current`
+variant uses the bundled fonts and needs no network. A Cormorant Garamond trial
+is included without making it the default:
+
+```bash
+python3 preview_studio.py --font cormorant-garamond
+```
+
+Open `render/studio-preview.html` after generating it. To add another trial,
+add one entry to `WTF_FONT_CONFIG.variants` with a stylesheet URL and whichever
+of the `brand`, `display` or `mono` roles it should override. A failed remote
+font request falls back to the current local fonts. Pass the same `--font`
+option to `build_scenes.py` when generating the OBS collection.
 
 ## Scenes
 
@@ -190,7 +205,8 @@ Set `CHROME` to another executable, or install the test browser with
 `npx playwright install chromium`. Node 20 or later is required for these tests.
 
 Shared styles, copy handling and the WTF mark live in `assets/brand.css` and
-`assets/brand.js`. Every overlay that shows the mark, including the lower
+`assets/brand.js`; typography variants live in `assets/font-config.js`. Every
+overlay that shows the mark, including the lower
 stack, hydrates it from the one template in `brand.js`, so the orbital signal
 completes a 12-second loop at every size while the wordmark remains steady.
 The planet in `assets/planet.js` is a WebGL shader using sphere and ring depth
