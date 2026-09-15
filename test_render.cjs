@@ -27,7 +27,7 @@ async function open(file,w=1920,h=1080,query=''){
   await page.evaluate(()=>window.WTF_FONTS_READY||document.fonts.ready);
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
 }
-test('font config keeps the local default and accepts a Google Fonts link',async()=>{
+test('font config keeps the local default and accepts a Google Font for every role',async()=>{
   await open('lower_stack.html',1920,196);
   assert.equal(await page.locator('html').getAttribute('data-font-variant'),'current');
   assert.match(await page.locator('html').evaluate(e=>e.style.getPropertyValue('--brand')),/Anybody/);
@@ -37,15 +37,21 @@ test('font config keeps the local default and accepts a Google Fonts link',async
   await trial.route(/^https?:/,route=>route.abort());
   await trial.addInitScript(()=>{window.WTF_FONT_CONFIG={
     default:{roles:{brand:'"Anybody", sans-serif',display:'"Dela Gothic One", sans-serif',mono:'"Fragment Mono", monospace'}},
-    googleFontsUrl:'https://fonts.google.com/specimen/Cormorant+Garamond',
-    googleFontRole:'brand'
+    googleFonts:{
+      brand:'https://fonts.google.com/specimen/Cormorant+Garamond',
+      display:'https://fonts.google.com/specimen/DM+Mono',
+      mono:'https://fonts.google.com/specimen/JetBrains+Mono'
+    }
   }});
   await trial.goto(pathToFileURL(path.join(assets,'lower_stack.html')).href);
   await trial.evaluate(()=>window.WTF_FONTS_READY);
   assert.equal(await trial.locator('html').getAttribute('data-font-variant'),'google-fonts');
-  assert.equal(await trial.locator('html').getAttribute('data-font-family'),'Cormorant Garamond');
+  assert.equal(await trial.locator('html').getAttribute('data-font-family'),'Cormorant Garamond, DM Mono, JetBrains Mono');
   assert.match(await trial.locator('html').evaluate(e=>e.style.getPropertyValue('--brand')),/Cormorant Garamond/);
-  assert.match(await trial.locator('link[data-google-font]').getAttribute('href'),/fonts\.googleapis\.com/);
+  assert.match(await trial.locator('html').evaluate(e=>e.style.getPropertyValue('--display')),/DM Mono/);
+  assert.match(await trial.locator('html').evaluate(e=>e.style.getPropertyValue('--mono')),/JetBrains Mono/);
+  assert.equal(await trial.locator('link[data-google-font]').count(),3);
+  assert.match(await trial.locator('link[data-google-font-role="mono"]').getAttribute('href'),/fonts\.googleapis\.com/);
   await trial.close();
 });
 for(const [file,w,h] of [['topbar.html',1920,96],['lower_stack.html',1920,196],['title_card.html',1920,1080],['outro_card.html',1920,1080],['starfield_bg.html',1920,1080],['participant_label.html',488,64]]){
@@ -81,7 +87,7 @@ test('sponsors loop in a bottom strip separate from host identities',async()=>{
     const strip=page.locator('.sponsor-strip');
     assert.equal(await strip.count(),1);
     assert.equal(await strip.locator('img[alt="Bev."]').count(),1);
-    assert.equal(await strip.locator('img.sponsor-bev').count(),2);
+    assert.ok(await strip.locator('img.sponsor-bev').count()>=2);
     assert.ok(await strip.locator('img[alt="Bev."]').evaluate(e=>
       e.complete && e.naturalWidth/e.naturalHeight>5.9 &&
       getComputedStyle(e).objectFit==='contain' &&
@@ -95,6 +101,13 @@ test('sponsors loop in a bottom strip separate from host identities',async()=>{
 });
 test('sponsor ticker moves continuously, freezes for debug and rests for reduced motion',async()=>{
   await open('lower_stack.html',1920,196);
+  assert.ok(await page.locator('.sponsor-track').evaluate(track=>{
+    const group=track.querySelector('.sponsor-group');
+    const viewport=track.closest('.sponsor-viewport');
+    const distance=Math.abs(parseFloat(getComputedStyle(track).getPropertyValue('--sponsor-loop-distance')));
+    return track.children.length>=Math.ceil(viewport.clientWidth/group.getBoundingClientRect().width)+2 &&
+      Math.abs(distance-group.getBoundingClientRect().width)<.1;
+  }));
   const liveBefore=await page.locator('.sponsor-track').evaluate(e=>getComputedStyle(e).transform);
   await page.waitForTimeout(180);
   const liveAfter=await page.locator('.sponsor-track').evaluate(e=>getComputedStyle(e).transform);

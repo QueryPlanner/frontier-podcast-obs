@@ -28,15 +28,19 @@ microphones or remote feeds, and it needs no credentials. Choose a scene from
 the menu or use F1 through F12.
 
 Typography lives in `assets/font-config.js`. The default uses the bundled fonts
-and needs no network. To try a Google Font, paste its specimen/share link or its
-`fonts.googleapis.com` CSS link into `googleFontsUrl`:
+and needs no network. Each role can independently use a Google Font: paste its
+specimen/share link or its `fonts.googleapis.com` CSS link into `googleFonts`:
 
 ```js
-googleFontsUrl: "https://fonts.google.com/specimen/Cormorant+Garamond",
+googleFonts: {
+  brand: "https://fonts.google.com/specimen/Cormorant+Garamond",
+  display: "",
+  mono: "https://fonts.google.com/specimen/JetBrains+Mono",
+},
 ```
 
-Set `googleFontRole` to one of the following values. One pasted font replaces
-one role at a time; the other roles continue using their bundled defaults.
+Leave any role empty to retain its bundled default. Each pasted link replaces
+only its corresponding role.
 
 | Role | Used for |
 | --- | --- |
@@ -56,8 +60,9 @@ open render/studio-preview.html
 
 Remote fonts need internet access when the OBS browser source loads them. After
 changing the link, use **Refresh cache of current page** on the browser sources
-or restart OBS. Clear `googleFontsUrl` to restore the current typography. A
-malformed link or failed remote request falls back to the current local fonts.
+or restart OBS. Clear an individual `googleFonts` value to restore that role's
+local typography. A malformed link or failed remote request falls back to the
+current local fonts.
 
 ## Scenes
 
@@ -67,10 +72,10 @@ malformed link or failed remote request falls back to the current local fonts.
 | F2 | 02 Solo · Chirag | Chirag’s camera |
 | F3 | 03 Solo · Parth | Parth’s camera |
 | F4 | 04 Duo | Default view with Chirag and Parth |
-| F5 | 05 Screen · Duo | Centred shared content with hosts in the lower edge corners |
+| F5 | 05 Screen · Duo | Large centred shared content with hosts in the centre side rails |
 | F6 | 06 Screen Full | Shared content fitted within the broadcast frame |
 | F7 | 07 Trio · With Guest | Chirag, the guest and Parth side by side, with the guest centred |
-| F8 | 08 Screen · Trio | Centred shared content with all three participants in edge corners |
+| F8 | 08 Screen · Trio | Large shared content on the left with a vertical three-person rail |
 | F9 | 09 Duo · Vertical | Stacked host cameras spanning the vertical safe zone |
 | F10 | 10 Outro | Closing card with both hosts and the moving sponsor strip |
 | F11 | 11 Solo · Guest | Guest camera |
@@ -211,7 +216,7 @@ Use the following rule to determine whether a rebuild is required:
 | Guest name and role | `--guest-name` and `--guest-role` | Rebuild and import the collections again |
 | VDO room, participant IDs and password | `.env` | Rebuild and import the collections again |
 | Scene layout and source geometry | `build_scenes.py` | Rebuild and import the collections again |
-| Google Font and font role | `assets/font-config.js` | Refresh each Browser Source or restart OBS; no rebuild |
+| Google Fonts by typography role | `assets/font-config.js` | Refresh each Browser Source or restart OBS; no rebuild |
 | Sponsor names, artwork and motion | Browser assets in `assets/` | Refresh each Browser Source or restart OBS; no rebuild |
 | Recording resolution, encoder and tracks | OBS settings or `apply_profile.sh` | Quit OBS before running the profile helper |
 

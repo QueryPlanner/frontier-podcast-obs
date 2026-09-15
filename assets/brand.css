@@ -66,5 +66,7 @@ h1,h2,p { margin:0; }
 .label .role { margin-left:auto; font:10px/1.4 var(--mono); text-transform:uppercase; letter-spacing:.08em; max-width:120px; }
 @media(max-width:500px) { .label .name { font-size:22px; font-variation-settings:"wdth" 90,"wght" 650; } .label .role { display:none; } }
 @keyframes drift { from { transform:translate3d(-10px,5px,0); } to { transform:translate3d(10px,-5px,0); } }
-@keyframes sponsor-loop { to { transform:translate3d(-50%,0,0); } }
+/* JS sets the distance to one complete sponsor group. The -50% fallback keeps
+   the two-group source markup looping before its first measurement. */
+@keyframes sponsor-loop { to { transform:translate3d(var(--sponsor-loop-distance,-50%),0,0); } }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; } .traveller { display:none; } .resting-signal { display:block!important; } }

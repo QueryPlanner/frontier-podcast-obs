@@ -414,25 +414,38 @@ def build(room, guest_id, password=None, *, parth_id=None, chirag_id=None,
         return (camera("Chirag", MARGIN, BAND_Y, duo_w, BAND_H) +
                 camera("Parth", MARGIN + duo_w + GAP, BAND_Y, duo_w, BAND_H))
 
-    def screen_with_people(names):
-        # Keep the 16:9 share centred and dominant. Participants sit in small
-        # corner cards outside it, so slide text is never covered or cropped.
-        content_w = 1280
-        content_h = 720
+    def screen_with_duo():
+        # Use readable host cards centered in the side rails, reserving clear
+        # space so they never cover the centred share.
+        card_w, card_h = 320, 240
+        content_w = CANVAS_W - MARGIN * 2 - GAP * 2 - card_w * 2
+        content_h = round(content_w * 9 / 16)
         content_x = (CANVAS_W - content_w) // 2
         content_y = BAND_Y + (BAND_H - content_h) // 2
-        card_w = content_x - MARGIN - GAP
-        card_h = 200
         left_x = MARGIN
         right_x = CANVAS_W - MARGIN - card_w
-        top_y = BAND_Y
-        bottom_y = BAND_Y + BAND_H - card_h
-        corners = ((left_x, bottom_y), (right_x, bottom_y),
-                   (left_x, top_y), (right_x, top_y))
+        center_y = BAND_Y + (BAND_H - card_h) // 2
         items = c.cell("SLOT · Content", content_x, content_y,
                        content_w, content_h, fill=False)
-        for name, (x, y) in zip(names, corners):
+        for name, (x, y) in zip(("Chirag", "Parth"),
+                                ((left_x, center_y), (right_x, center_y))):
             items += camera(name, x, y, card_w, card_h)
+        return items
+
+    def screen_with_trio():
+        # A screen-led three-person view: retain the original vertical people
+        # rail and give the share the entire left side of the broadcast band.
+        content_h = BAND_H
+        content_w = round(content_h * 16 / 9)
+        content_x, content_y = MARGIN, BAND_Y
+        rail_x = content_x + content_w + GAP
+        rail_w = CANVAS_W - MARGIN - rail_x
+        card_h = (BAND_H - GAP * 2) // 3
+        items = c.cell("SLOT · Content", content_x, content_y,
+                       content_w, content_h, fill=False)
+        for index, name in enumerate(("Chirag", "Parth", "Guest")):
+            items += camera(name, rail_x, BAND_Y + index * (card_h + GAP),
+                            rail_w, card_h)
         return items
 
     c.scene("01 Standby", layers([c.item("CARD · Title", *full)]), "OBS_KEY_F1")
@@ -444,7 +457,7 @@ def build(room, guest_id, password=None, *, parth_id=None, chirag_id=None,
             "OBS_KEY_F3")
     c.scene("04 Duo", layers(chrome(), duo()), "OBS_KEY_F4")
     c.scene("05 Screen · Duo",
-            layers(chrome(), screen_with_people(["Chirag", "Parth"])),
+            layers(chrome(), screen_with_duo()),
             "OBS_KEY_F5")
     c.scene("06 Screen Full",
             layers(chrome(), c.cell("SLOT · Content", MARGIN, BAND_Y,
@@ -455,7 +468,7 @@ def build(room, guest_id, password=None, *, parth_id=None, chirag_id=None,
                        trio_w, BAND_H)
     c.scene("07 Trio · With Guest", layers(chrome(), trio), "OBS_KEY_F7")
     c.scene("08 Screen · Trio",
-            layers(chrome(), screen_with_people(["Chirag", "Parth", "Guest"])),
+            layers(chrome(), screen_with_trio()),
             "OBS_KEY_F8")
     ou_h = (BAND_H - GAP) // 2
     ou_w = round(CANVAS_H * 9 / 16) + 32

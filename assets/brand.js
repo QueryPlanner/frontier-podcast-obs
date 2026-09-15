@@ -32,31 +32,36 @@
     }
   }
 
-  const selectedFont = googleFont(fontConfig.googleFontsUrl);
-  const selectedRole = roleVariables[fontConfig.googleFontRole]
-    ? fontConfig.googleFontRole : "brand";
-  if (selectedFont) {
-    const fallback = defaultRoles[selectedRole] || "sans-serif";
-    fontRoles[selectedRole] = `"${selectedFont.family}", ${fallback}`;
+  // `googleFonts` supports a different remote family for every typography
+  // role. The older single URL fields remain accepted for existing overrides.
+  const configuredFonts = fontConfig.googleFonts && typeof fontConfig.googleFonts === "object"
+    ? fontConfig.googleFonts : {[fontConfig.googleFontRole || "brand"]: fontConfig.googleFontsUrl};
+  const selectedFonts = Object.fromEntries(Object.entries(roleVariables)
+    .map(([role]) => [role, googleFont(configuredFonts[role])])
+    .filter(([, font]) => font));
+  for (const [role, font] of Object.entries(selectedFonts)) {
+    const fallback = defaultRoles[role] || "sans-serif";
+    fontRoles[role] = `"${font.family}", ${fallback}`;
   }
-  document.documentElement.dataset.fontVariant = selectedFont ? "google-fonts" : "current";
-  if (selectedFont) document.documentElement.dataset.fontFamily = selectedFont.family;
+  const selectedFamilies = Object.values(selectedFonts).map(font => font.family);
+  document.documentElement.dataset.fontVariant = selectedFamilies.length ? "google-fonts" : "current";
+  if (selectedFamilies.length) document.documentElement.dataset.fontFamily = selectedFamilies.join(", ");
   Object.entries(fontRoles).forEach(([role, stack]) => {
     if (roleVariables[role] && typeof stack === "string")
       document.documentElement.style.setProperty(roleVariables[role], stack);
   });
-  let stylesheetReady = Promise.resolve();
-  if (selectedFont) {
-    stylesheetReady = new Promise(resolve => {
+  const stylesheetReady = Promise.all(Object.entries(selectedFonts).map(([role, font]) =>
+    new Promise(resolve => {
       const link = document.createElement("link");
       link.rel = "stylesheet";
-      link.href = selectedFont.stylesheet;
-      link.dataset.googleFont = selectedFont.family;
+      link.href = font.stylesheet;
+      link.dataset.googleFont = font.family;
+      link.dataset.googleFontRole = role;
       link.addEventListener("load", resolve, {once: true});
       link.addEventListener("error", resolve, {once: true});
       document.head.append(link);
-    });
-  }
+    })
+  ));
   // Consumers and tests can await the selected remote stylesheet without
   // delaying the current local-font default.
   window.WTF_FONTS_READY = stylesheetReady.then(() => document.fonts.ready);
@@ -105,6 +110,29 @@
     const strip = tpl.content.firstElementChild;
     strip.classList.add(...el.classList);
     el.replaceWith(strip);
+
+    // A group is narrower than the broadcast frame. Repeat it until every
+    // point of the viewport has a following group as the track advances one
+    // group-width, then restart at an identical group with no blank interval.
+    const fillSponsorTrack = () => {
+      const viewport = strip.querySelector(".sponsor-viewport");
+      const track = strip.querySelector(".sponsor-track");
+      const source = track?.querySelector(".sponsor-group");
+      if (!viewport || !track || !source) return;
+      const groupWidth = source.getBoundingClientRect().width;
+      if (!groupWidth) return;
+      track.style.setProperty("--sponsor-loop-distance", `-${groupWidth}px`);
+      const requiredGroups = Math.ceil(viewport.clientWidth / groupWidth) + 2;
+      while (track.children.length < requiredGroups) {
+        const copy = source.cloneNode(true);
+        copy.setAttribute("aria-hidden", "true");
+        copy.dataset.sponsorClone = "";
+        copy.querySelectorAll("img").forEach(img => img.alt = "");
+        track.append(copy);
+      }
+    };
+    requestAnimationFrame(fillSponsorTrack);
+    new ResizeObserver(fillSponsorTrack).observe(strip);
   });
   document.querySelectorAll("[data-copy]").forEach(el => {
     el.textContent = readText(el.dataset.copy, el.textContent, Number(el.dataset.limit) || 120);

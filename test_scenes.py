@@ -193,20 +193,20 @@ class TestGeometry(unittest.TestCase):
             self.assertLessEqual(x0, lo, f'{f["name"]} left edge {x0} inside safe zone {lo}')
             self.assertGreaterEqual(x1, hi, f'{f["name"]} right edge {x1} inside safe zone {hi}')
 
-    def test_screen_share_is_centred_with_people_in_edge_corners(self):
-        """Screen scenes keep a full 16:9 share centred while camera cards sit
-        in the free left/right edges instead of shrinking or covering it."""
-        for scene_name in ("05 Screen · Duo", "08 Screen · Trio"):
-            sc = next(s for s in self.scenes if s["name"] == scene_name)
-            by_name = {it["name"]: box(it) for it in cells(sc)}
-            screen = by_name["SLOT · Content"]
-            self.assertEqual(screen, (320.0, 130.0, 1600.0, 850.0))
-            cameras = [bounds for name, bounds in by_name.items()
-                       if name.startswith("CAM · ")]
-            for x0, y0, x1, y1 in cameras:
-                self.assertIn((x0, x1), ((48.0, 296.0), (1624.0, 1872.0)))
-                self.assertIn((y0, y1), ((112.0, 312.0), (668.0, 868.0)))
-                self.assertTrue(x1 <= screen[0] or x0 >= screen[2])
+    def test_duo_screen_is_large_and_hosts_stay_in_centre_side_rails(self):
+        sc = next(s for s in self.scenes if s["name"] == "05 Screen · Duo")
+        by_name = {it["name"]: box(it) for it in cells(sc)}
+        self.assertEqual(by_name["SLOT · Content"], (392.0, 170.0, 1528.0, 809.0))
+        self.assertEqual(by_name["CAM · Chirag"], (48.0, 370.0, 368.0, 610.0))
+        self.assertEqual(by_name["CAM · Parth"], (1552.0, 370.0, 1872.0, 610.0))
+
+    def test_trio_screen_is_left_with_a_vertical_people_rail(self):
+        sc = next(s for s in self.scenes if s["name"] == "08 Screen · Trio")
+        by_name = {it["name"]: box(it) for it in cells(sc)}
+        self.assertEqual(by_name["SLOT · Content"], (48.0, 112.0, 1392.0, 868.0))
+        self.assertEqual(by_name["CAM · Chirag"], (1416.0, 112.0, 1872.0, 348.0))
+        self.assertEqual(by_name["CAM · Parth"], (1416.0, 372.0, 1872.0, 608.0))
+        self.assertEqual(by_name["CAM · Guest"], (1416.0, 632.0, 1872.0, 868.0))
 
 
 class TestSchema(unittest.TestCase):
@@ -752,7 +752,9 @@ class TestDuoStudio(unittest.TestCase):
     def test_default_font_stays_in_shared_config(self):
         with open(os.path.join(bs.ASSETS, "font-config.js")) as f:
             config = f.read()
-        self.assertIn('googleFontsUrl: ""', config)
+        self.assertIn('googleFonts: {', config)
+        for role in ("brand", "display", "mono"):
+            self.assertIn(f'{role}: ""', config)
         self.assertIn('brand: \'"Anybody", sans-serif\'', config)
         for asset in ("topbar.html", "lower_stack.html", "title_card.html",
                       "outro_card.html", "participant_label.html",
