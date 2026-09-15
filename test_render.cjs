@@ -51,15 +51,16 @@ test('full-frame cards and background remain opaque',async()=>{
     for(let i=3;i<im.data.length;i+=4)assert.equal(im.data[i],255);
   }
 });
-test('brands share a strip separate from host identities and websites',async()=>{
+test('sponsors loop in a bottom strip separate from host identities',async()=>{
   for(const file of ['lower_stack.html','title_card.html','outro_card.html']){
     await open(file,1920,file==='lower_stack.html'?196:1080);
     for(const text of ['lordpatil.com','parthshastri.co.in','Lord Socks','House of Lords'])assert.ok((await page.locator('body').innerText()).includes(text));
     assert.equal(await page.locator('img[alt="Bev."]').count(),1);
     assert.ok(!(await page.locator('body').innerText()).includes('Bev.'));
-    const strip=page.locator('.brand-strip');
+    const strip=page.locator('.sponsor-strip');
     assert.equal(await strip.count(),1);
     assert.equal(await strip.locator('img[alt="Bev."]').count(),1);
+    assert.equal(await strip.locator('img.sponsor-bev').count(),2);
     assert.ok(await strip.locator('img[alt="Bev."]').evaluate(e=>
       e.complete && e.naturalWidth/e.naturalHeight>5.9 &&
       getComputedStyle(e).objectFit==='contain' &&
@@ -67,9 +68,22 @@ test('brands share a strip separate from host identities and websites',async()=>
     assert.match(await strip.innerText(),/Lord Socks/);
     assert.match(await strip.innerText(),/House of Lords/);
     assert.doesNotMatch(await strip.innerText(),/Chirag|Parth|lordpatil|parthshastri/);
-    assert.equal(await page.locator('.host-identity .brand-strip, .host-identity .bev-logo').count(),0);
-    assert.ok(await strip.evaluate(e=>e.scrollWidth<=e.clientWidth));
+    assert.equal(await page.locator('.host-identity .sponsor-strip, .host-identity .sponsor-bev').count(),0);
+    assert.ok(await strip.evaluate(e=>e.getBoundingClientRect().bottom<=document.documentElement.clientHeight));
   }
+});
+test('sponsor ticker moves continuously, freezes for debug and rests for reduced motion',async()=>{
+  await open('lower_stack.html',1920,196);
+  const liveBefore=await page.locator('.sponsor-track').evaluate(e=>getComputedStyle(e).transform);
+  await page.waitForTimeout(180);
+  const liveAfter=await page.locator('.sponsor-track').evaluate(e=>getComputedStyle(e).transform);
+  assert.notEqual(liveBefore,liveAfter);
+  await open('lower_stack.html',1920,196,'?t=3');
+  assert.ok(await page.locator('.sponsor-track').evaluate(e=>e.getAnimations().every(a=>a.playState==='paused')));
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await open('lower_stack.html',1920,196);
+  assert.equal(await page.locator('.sponsor-track').evaluate(e=>getComputedStyle(e).animationName),'none');
+  await page.emulateMedia({reducedMotion:'no-preference'});
 });
 test('episode overrides and long text fit without injected markup',async()=>{
   const title='Exploring the future of artificial intelligence and the people building it';
@@ -80,7 +94,7 @@ test('episode overrides and long text fit without injected markup',async()=>{
   assert.equal(await page.locator('.name img').count(),0);
 });
 test('guest name and role fit the narrowest camera rail',async()=>{
-  await open('participant_label.html',488,64,'?name=Dr.%20Alexandra%20Chandrasekhar&role=AI%20Researcher');
+  await open('participant_label.html',216,64,'?name=Dr.%20Alexandra%20Chandrasekhar&role=AI%20Researcher');
   assert.ok(await page.locator('.name').evaluate(e=>e.scrollWidth<=e.clientWidth+1));
 });
 const LOGO_PAGES=[['title_card.html',1920,1080],['lower_stack.html',1920,196],['outro_card.html',1920,1080]];

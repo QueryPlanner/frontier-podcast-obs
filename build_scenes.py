@@ -415,17 +415,24 @@ def build(room, guest_id, password=None, *, parth_id=None, chirag_id=None,
                 camera("Parth", MARGIN + duo_w + GAP, BAND_Y, duo_w, BAND_H))
 
     def screen_with_people(names):
-        # Keep shared content at 16:9 and fit instead of cropping slide text.
+        # Keep the 16:9 share centred and dominant. Participants sit in small
+        # corner cards outside it, so slide text is never covered or cropped.
         content_w = 1280
         content_h = 720
-        rail_w = width - content_w - GAP
-        rail_h = (BAND_H - GAP * (len(names) - 1)) // len(names)
-        items = c.cell("SLOT · Content", MARGIN,
-                       BAND_Y + (BAND_H - content_h) // 2,
+        content_x = (CANVAS_W - content_w) // 2
+        content_y = BAND_Y + (BAND_H - content_h) // 2
+        card_w = content_x - MARGIN - GAP
+        card_h = 200
+        left_x = MARGIN
+        right_x = CANVAS_W - MARGIN - card_w
+        top_y = BAND_Y
+        bottom_y = BAND_Y + BAND_H - card_h
+        corners = ((left_x, bottom_y), (right_x, bottom_y),
+                   (left_x, top_y), (right_x, top_y))
+        items = c.cell("SLOT · Content", content_x, content_y,
                        content_w, content_h, fill=False)
-        for index, name in enumerate(names):
-            items += camera(name, MARGIN + content_w + GAP,
-                            BAND_Y + index * (rail_h + GAP), rail_w, rail_h)
+        for name, (x, y) in zip(names, corners):
+            items += camera(name, x, y, card_w, card_h)
         return items
 
     c.scene("01 Standby", layers([c.item("CARD · Title", *full)]), "OBS_KEY_F1")
@@ -443,7 +450,7 @@ def build(room, guest_id, password=None, *, parth_id=None, chirag_id=None,
             layers(chrome(), c.cell("SLOT · Content", MARGIN, BAND_Y,
                                    width, BAND_H, fill=False)), "OBS_KEY_F6")
     trio = []
-    for index, name in enumerate(("Chirag", "Parth", "Guest")):
+    for index, name in enumerate(("Chirag", "Guest", "Parth")):
         trio += camera(name, MARGIN + index * (trio_w + GAP), BAND_Y,
                        trio_w, BAND_H)
     c.scene("07 Trio · With Guest", layers(chrome(), trio), "OBS_KEY_F7")

@@ -11,7 +11,7 @@ headlines and readable body copy, and Fragment Mono handles metadata.
 All three fonts are bundled locally with their licenses.
 
 Host identities show **lordpatil.com** for Chirag and **parthshastri.co.in** for Parth.
-**Lord Socks**, **House of Lords** and the supplied **Bev. SVG logo** appear together in a shared brand strip, separate from either host.
+**Lord Socks**, **House of Lords** and the supplied **Bev. SVG logo** rotate continuously through a compact sponsor strip at the bottom, separate from either host.
 The Bev. artwork is preserved without redrawing or substituting typed text.
 
 ## Preview the studio
@@ -34,12 +34,12 @@ the menu or use F1 through F12.
 | F2 | 02 Solo · Chirag | Chirag’s camera |
 | F3 | 03 Solo · Parth | Parth’s camera |
 | F4 | 04 Duo | Default view with Chirag and Parth |
-| F5 | 05 Screen · Duo | Large shared content with both hosts |
+| F5 | 05 Screen · Duo | Centred shared content with hosts in the lower edge corners |
 | F6 | 06 Screen Full | Shared content fitted within the broadcast frame |
-| F7 | 07 Trio · With Guest | Chirag, Parth and the guest side by side |
-| F8 | 08 Screen · Trio | Large shared content with all three participants |
+| F7 | 07 Trio · With Guest | Chirag, the guest and Parth side by side, with the guest centred |
+| F8 | 08 Screen · Trio | Centred shared content with all three participants in edge corners |
 | F9 | 09 Duo · Vertical | Stacked host cameras spanning the vertical safe zone |
-| F10 | 10 Outro | Closing card with both hosts and the shared brand strip |
+| F10 | 10 Outro | Closing card with both hosts and the moving sponsor strip |
 | F11 | 11 Solo · Guest | Guest camera |
 | F12 | 12 Break | Animated standby card reading “Back shortly” |
 

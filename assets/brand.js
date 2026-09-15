@@ -20,6 +20,14 @@
 </g>
 <path d="${WORDMARK}" transform="translate(114.6 282)" fill="#F2EBDD"/>
 </svg>`;
+  const SPONSOR_GROUP = (duplicate = false) => `<div class="sponsor-group"${duplicate ? ' aria-hidden="true"' : ""}>
+<span class="sponsor-name">Lord Socks</span><span class="sponsor-separator" aria-hidden="true"></span>
+<span class="sponsor-name">House of Lords</span><span class="sponsor-separator" aria-hidden="true"></span>
+<img class="sponsor-bev" src="bev-logo.svg" alt="${duplicate ? "" : "Bev."}">
+</div>`;
+  const SPONSORS = `<aside class="sponsor-strip" aria-label="Sponsors">
+<span class="sponsor-kicker">Sponsors</span><div class="sponsor-viewport"><div class="sponsor-track">${SPONSOR_GROUP()}${SPONSOR_GROUP(true)}</div></div>
+</aside>`;
   document.querySelectorAll("[data-logo]").forEach(el => {
     const tpl = document.createElement("template");
     tpl.innerHTML = LOGO;
@@ -30,6 +38,13 @@
     // stays 4.5px wide on screen whatever size the mark is drawn at.
     const k = 900 / (svg.getBoundingClientRect().width || 900);
     svg.querySelectorAll(".signal").forEach(g => g.setAttribute("transform", `scale(${k.toFixed(4)})`));
+  });
+  document.querySelectorAll("[data-sponsors]").forEach(el => {
+    const tpl = document.createElement("template");
+    tpl.innerHTML = SPONSORS;
+    const strip = tpl.content.firstElementChild;
+    strip.classList.add(...el.classList);
+    el.replaceWith(strip);
   });
   document.querySelectorAll("[data-copy]").forEach(el => {
     el.textContent = readText(el.dataset.copy, el.textContent, Number(el.dataset.limit) || 120);

@@ -22,30 +22,33 @@ h1,h2,p { margin:0; }
 .planet { position:absolute; width:830px; height:830px; right:-60px; top:135px; }
 .page-edge { position:absolute; inset:38px 48px auto; height:60px; display:flex; align-items:center; justify-content:space-between; gap:30px; border-bottom:1px solid var(--rule); }
 .page-edge .mini-mark { font:28px/1 var(--display); letter-spacing:-.06em; }
-.page-footer { position:absolute; left:48px; right:48px; bottom:42px; display:flex; justify-content:space-between; align-items:center; gap:36px; border-top:1px solid var(--rule); padding-top:28px; }
+.page-footer { position:absolute; left:48px; right:48px; bottom:104px; display:flex; align-items:center; gap:36px; border-top:1px solid var(--rule); padding-top:28px; }
 .host-identity { display:flex; align-items:center; gap:64px; }
 .host-identity h2 { font-size:25px; font-variation-settings:"wdth" 112,"wght" 600; }
 .host-identity .website { font:14px/1.8 var(--mono); color:var(--muted); }
-.brand-strip { display:flex; align-items:center; justify-content:space-between; gap:32px; border-left:1px solid var(--rule); padding-left:36px; }
-.brand-item { white-space:nowrap; font-size:21px; font-variation-settings:"wdth" 110,"wght" 550; }
-.page-footer .brand-strip { width:700px; }
-.bev-logo { display:block; flex:none; width:244px; height:68px; padding:14px 18px; object-fit:contain; background:var(--bone); border-radius:4px; }
+.sponsor-strip { display:flex; align-items:center; height:52px; overflow:hidden; border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); background:#07080DEB; }
+.sponsor-kicker { position:relative; z-index:1; align-self:stretch; display:flex; flex:none; align-items:center; width:132px; padding-left:16px; border-right:1px solid var(--rule); background:var(--void); color:var(--orbital); font:11px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase; }
+.sponsor-viewport { min-width:0; flex:1; overflow:hidden; -webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent); mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent); }
+.sponsor-track { display:flex; width:max-content; will-change:transform; animation:sponsor-loop 24s linear infinite; }
+.sponsor-group { display:flex; flex:none; align-items:center; gap:42px; padding:0 42px; }
+.sponsor-name { white-space:nowrap; font-size:17px; font-variation-settings:"wdth" 110,"wght" 570; }
+.sponsor-separator { width:4px; height:4px; border-radius:50%; background:var(--spectral); }
+.sponsor-bev { display:block; flex:none; width:142px; height:38px; padding:7px 10px; object-fit:contain; background:var(--bone); border-radius:3px; }
+.frame > .sponsor-strip { position:absolute; left:48px; right:48px; bottom:24px; }
 .topbar { width:1920px; height:96px; padding:0 48px; display:flex; align-items:center; justify-content:space-between; gap:32px; }
 .topbar .brand { display:flex; align-items:center; gap:30px; }
 .topbar .mark { font:34px/1 var(--display); letter-spacing:-.07em; }
 .topbar .show-name { font-size:25px; font-variation-settings:"wdth" 118,"wght" 550; letter-spacing:-.02em; }
 .topbar .details { display:flex; align-items:center; gap:32px; }
 .topbar .details > * + * { border-left:1px solid var(--rule); padding-left:32px; }
-.lower { width:1920px; height:196px; padding:0 48px 24px; }
-.lower-grid { display:grid; grid-template-columns:168px minmax(0,1fr) 650px; height:100%; gap:28px; align-items:center; border-top:1px solid var(--rule); }
+.lower { position:relative; width:1920px; height:196px; padding:0 48px; }
+.lower-grid { display:grid; grid-template-columns:148px minmax(0,1fr); height:140px; gap:28px; align-items:center; border-top:1px solid var(--rule); }
 .wtf-mark { display:block; height:auto; overflow:visible; }
-.lower-logo { width:165px; }
-.lower .episode-title { font-size:36px; line-height:1.25; font-variation-settings:"wdth" 110,"wght" 570; letter-spacing:-.035em; max-height:92px; }
-.lower .episode-meta { margin-bottom:12px; font-size:12px; }
+.lower-logo { width:142px; }
+.lower .episode-title { font-size:34px; line-height:1.18; font-variation-settings:"wdth" 110,"wght" 570; letter-spacing:-.035em; max-height:80px; }
+.lower .episode-meta { margin-bottom:8px; font-size:11px; }
 .lower .host-sites { display:flex; gap:24px; margin-top:12px; font:13px/1.4 var(--mono); color:var(--muted); }
-.lower .brand-strip { min-height:96px; padding-left:28px; gap:24px; }
-.lower .brand-item { font-size:19px; }
-.lower .bev-logo { width:224px; height:64px; padding:14px 16px; }
+.lower .sponsor-strip { position:absolute; left:48px; right:48px; bottom:0; height:48px; }
 .card-content { position:absolute; left:90px; top:185px; width:1060px; }
 .card-content .orbital-logo { width:1000px; height:auto; display:block; margin:0 0 4px -38px; }
 .card-content .show-name { font-size:59px; line-height:1.05; font-variation-settings:"wdth" 135,"wght" 650; letter-spacing:-.045em; }
@@ -61,6 +64,7 @@ h1,h2,p { margin:0; }
 .label .name { font-size:25px; line-height:1.2; font-variation-settings:"wdth" 110,"wght" 650; white-space:nowrap; }
 .label .website { font:11px/1.5 var(--mono); color:var(--muted); }
 .label .role { margin-left:auto; font:10px/1.4 var(--mono); text-transform:uppercase; letter-spacing:.08em; max-width:120px; }
-@media(max-width:500px) { .label .name { font-size:22px; } .label .role { display:none; } }
+@media(max-width:500px) { .label .name { font-size:22px; font-variation-settings:"wdth" 90,"wght" 650; } .label .role { display:none; } }
 @keyframes drift { from { transform:translate3d(-10px,5px,0); } to { transform:translate3d(10px,-5px,0); } }
+@keyframes sponsor-loop { to { transform:translate3d(-50%,0,0); } }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; } .traveller { display:none; } .resting-signal { display:block!important; } }

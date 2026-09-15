@@ -193,19 +193,20 @@ class TestGeometry(unittest.TestCase):
             self.assertLessEqual(x0, lo, f'{f["name"]} left edge {x0} inside safe zone {lo}')
             self.assertGreaterEqual(x1, hi, f'{f["name"]} right edge {x1} inside safe zone {hi}')
 
-    def test_three_column_keeps_content_largest(self):
-        """The point of the 3-column layout is that shared content stays big.
-        If a side rail ever gets wider than the centre, the layout has drifted."""
-        sc = next(s for s in self.scenes if s["name"] == "05 Screen · Duo")
-        by_name = {}
-        for it in cells(sc):
-            by_name.setdefault(it["name"], []).append(box(it))
-        screen = by_name["SLOT · Content"][0]
-        screen_w = screen[2] - screen[0]
-        for rail in ("CAM · Chirag", "CAM · Parth"):
-            rw = by_name[rail][0][2] - by_name[rail][0][0]
-            self.assertGreater(screen_w, rw * 2,
-                               "centre content should dominate the side rails")
+    def test_screen_share_is_centred_with_people_in_edge_corners(self):
+        """Screen scenes keep a full 16:9 share centred while camera cards sit
+        in the free left/right edges instead of shrinking or covering it."""
+        for scene_name in ("05 Screen · Duo", "08 Screen · Trio"):
+            sc = next(s for s in self.scenes if s["name"] == scene_name)
+            by_name = {it["name"]: box(it) for it in cells(sc)}
+            screen = by_name["SLOT · Content"]
+            self.assertEqual(screen, (320.0, 130.0, 1600.0, 850.0))
+            cameras = [bounds for name, bounds in by_name.items()
+                       if name.startswith("CAM · ")]
+            for x0, y0, x1, y1 in cameras:
+                self.assertIn((x0, x1), ((48.0, 296.0), (1624.0, 1872.0)))
+                self.assertIn((y0, y1), ((112.0, 312.0), (668.0, 868.0)))
+                self.assertTrue(x1 <= screen[0] or x0 >= screen[2])
 
 
 class TestSchema(unittest.TestCase):
@@ -373,13 +374,16 @@ class TestAssetWiring(unittest.TestCase):
             self.assertEqual(self.params(name)["parthSite"], ["parthshastri.co.in"])
 
     def test_brands_use_the_supplied_bev_artwork(self):
+        with open(os.path.join(bs.ASSETS, "brand.js")) as f:
+            sponsor_component = f.read()
+        self.assertIn('src="bev-logo.svg"', sponsor_component)
+        self.assertIn("Lord Socks", sponsor_component)
+        self.assertIn("House of Lords", sponsor_component)
+        self.assertNotIn("Dev Drink", sponsor_component)
         for asset in ("lower_stack.html", "title_card.html", "outro_card.html"):
             with open(os.path.join(bs.ASSETS, asset)) as f:
                 html = f.read()
-            self.assertIn('src="bev-logo.svg"', html)
-            self.assertIn("Lord Socks", html)
-            self.assertIn("House of Lords", html)
-            self.assertNotIn("Dev Drink", html)
+            self.assertIn("data-sponsors", html)
 
     def test_params_are_url_encoded(self):
         """Pipes and spaces must survive the query string intact."""
@@ -667,6 +671,12 @@ class TestDuoStudio(unittest.TestCase):
     def test_trio_has_three_distinct_participants(self):
         self.assertEqual(self.scene_feeds("07 Trio · With Guest"),
                          {"CAM · Chirag", "CAM · Parth", "CAM · Guest"})
+
+    def test_guest_is_centered_in_trio(self):
+        scene = self.by_name["07 Trio · With Guest"]
+        guest = next(it for it in cells(scene) if it["name"] == "CAM · Guest")
+        x0, _, x1, _ = box(guest)
+        self.assertAlmostEqual((x0 + x1) / 2, CANVAS_W / 2)
 
     def test_screen_views_keep_the_hosts_and_add_optional_guest(self):
         self.assertEqual(self.scene_feeds("05 Screen · Duo"),
