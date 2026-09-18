@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-Generate the OBS scene collection for "The Frontier Podcast".
+Generate the OBS scene collection for "What's the Frontier".
 
-Layout follows broadcast-news grammar rather than stream-overlay grammar:
-a fixed top status strip, hard-edged camera cells in a middle band, and a
-stacked lower block (hosts / headline / sponsors / ticker). Chrome is HTML
-rendered by obs-browser; only the geometry lives here.
+Chirag and Parth are the default duo, with a separate optional guest feed.
+HTML overlays share the WTF typography, palette and supplied brand artwork.
+The geometry and six-track audio routing live here.
 
 Schema mirrored from an OBS-written collection (format version 2) on
 OBS 32.x / macOS, so field names match what OBS itself emits.
@@ -14,36 +13,39 @@ The remote guest arrives over VDO.Ninja (WebRTC) rather than by screen-capturing
 a call window, so their camera and their screen share are two independently
 addressable streams. See TRANSPORT below for the full signal path.
 
-Usage:  VDO_ROOM=... VDO_GUEST_ID=... python3 build_scenes.py [-o OUTPUT.json]
+Usage: set VDO_ROOM and participant IDs, then use --both-local-hosts to
+generate both collection choices for OBS, or --local-host for one variant.
 """
 
 import argparse
 import json
 import os
-import sys
 import uuid
+from pathlib import Path
 from urllib.parse import quote
 
 CANVAS_W, CANVAS_H = 1920, 1080
-COLLECTION_NAME = "Frontier Podcast"
+COLLECTION_NAME = "WTF"
 ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
 # Audio track bitmask: track N is bit (N-1).
 TRACK_1, TRACK_2, TRACK_3, TRACK_6 = 1 << 0, 1 << 1, 1 << 2, 1 << 5
+TRACK_4, TRACK_5 = 1 << 3, 1 << 4
 
 # --- TRANSPORT --------------------------------------------------------------
-# Host  : joins https://vdo.ninja/?director=ROOM in Chrome, wearing headphones.
+# Local : the selected host joins the room's director tab wearing headphones.
 #         That tab is the *talkback* path -- it is how the guest hears the host,
 #         and how the host hears the guest. OBS never plays guest audio out
 #         (every source keeps monitoring_type 0); if it did, the host would hear
 #         the guest twice at different latencies, which combs rather than adds.
-#         The host's own voice is recorded from the local interface by MIC — Me,
+#         The host's own voice is recorded from the local interface by MIC,
 #         not from the browser, so it stays uncompressed and ~0ms.
 # Guest : opens the push link printed by --guest-link. That link also carries
 #         &record, so their browser writes a pristine local copy to disk while
 #         the compressed WebRTC feed drives these scenes. Clap at the top of the
 #         episode; it is the sync point for swapping that file in during the edit.
-# OBS   : receive-only. Two browser sources view the guest's two stream IDs.
+# Cohost: opens --parth-link or --chirag-link, depending on who is remote.
+# OBS   : receive-only. Four browser sources receive the two remote people.
 VDO = "https://vdo.ninja/"
 
 # OBS only activates a source's audio while the source is in the program scene
@@ -58,11 +60,11 @@ SLOT = "slot"
 
 # --- broadcast grid ---------------------------------------------------------
 # The middle band is whatever the top strip and lower block do not occupy.
-TOPBAR_H = 110
-LOWER_H = 340
-BAND_Y = TOPBAR_H + 8
-BAND_H = CANVAS_H - LOWER_H - BAND_Y - 8      # 614
-MARGIN, GAP, BORDER = 12, 8, 3
+TOPBAR_H = 96
+LOWER_H = 196
+BAND_Y = TOPBAR_H + 16
+BAND_H = CANVAS_H - LOWER_H - BAND_Y - 16
+MARGIN, GAP, BORDER = 48, 24, 2
 
 ASPECT = CANVAS_W / CANVAS_H
 
@@ -152,8 +154,8 @@ def check_room(raw):
 
 
 # Show palette, matched to the generated assets.
-CYAN = rgba(0x35, 0xE0, 0xFF)
-VOID = rgba(0x05, 0x06, 0x0D)
+SPECTRAL = rgba(0x8B, 0x7C, 0xFF)
+VOID = rgba(0x07, 0x08, 0x0D)
 
 
 class Collection:
@@ -176,10 +178,10 @@ class Collection:
         self.by_name[name] = u
         return u
 
-    def browser(self, name, filename, w, h, **params):
+    def browser(self, source_name, filename, w, h, **params):
         """obs-browser renders offscreen at a fixed size, so w/h must match
         the asset's own pixel dimensions or it composites at the wrong scale."""
-        return self.source("browser_source", name, {
+        return self.source("browser_source", source_name, {
             "url": asset_url(filename, **params),
             "width": w, "height": h,
             "reroute_audio": False,
@@ -226,7 +228,15 @@ class Collection:
             "scale_ref": {"x": float(CANVAS_W), "y": float(CANVAS_H)},
             "align": 5,
             "bounds_type": 3 if fill else 2,
-            "bounds_align": 0, "bounds_crop": False,
+            # bounds_crop is OBS's "Crop to Bounding Box". Without it, a
+            # scale-outer item is scaled to *cover* its box and the overflow is
+            # still drawn -- OBS bounds position and scale, they do not clip.
+            # A 16:9 camera in a 2.41:1 cell then bleeds ~135px above and below
+            # its cell, over the top bar and into the lower stack, while the
+            # selection rectangle in the preview stays exactly where it should.
+            # That is what makes it read as a layout bug rather than a fill
+            # mode: every number is right and the picture is still wrong.
+            "bounds_align": 0, "bounds_crop": fill,
             "crop_left": 0, "crop_top": 0, "crop_right": 0, "crop_bottom": 0,
             "id": 0, "group_item_backup": False,
             "pos": {"x": float(x), "y": float(y)}, "pos_rel": pos_rel(x, y),
@@ -238,12 +248,12 @@ class Collection:
             "private_settings": {"frontier_role": role} if role else {},
         }
 
-    def cell(self, name, x, y, w, h):
+    def cell(self, name, x, y, w, h, fill=True):
         """A camera cell: accent border behind, feed cropped to fill on top.
         Returns items in top-first order for scene()."""
         return [
-            self.item(name, x, y, w, h, fill=True),
-            self.item("UI — Cell Border", x - BORDER, y - BORDER,
+            self.item(name, x, y, w, h, fill=fill),
+            self.item("UI · Cell Border", x - BORDER, y - BORDER,
                       w + BORDER * 2, h + BORDER * 2),
         ]
 
@@ -258,7 +268,7 @@ class Collection:
         """OBS stores items bottom-to-top; callers pass them top-first.
 
         fkey=None makes an un-hotkeyed scene that stays out of scene_order:
-        used for SLOT — Content, which is a source container rather than
+        used for SLOT · Content, which is a source container rather than
         something you ever cut to."""
         ordered = list(reversed(items))
         for i, it in enumerate(ordered, start=1):
@@ -298,188 +308,192 @@ def guest_link(room, guest_id, password=None, record_kbps=6000):
                    password=password, record=record_kbps)
 
 
-def build(room, guest_id, password=None):
-    if not room or not guest_id:
-        raise ValueError("room and guest_id are required")
-    room, guest_id = check_room(room), stream_id(guest_id)
+def build(room, guest_id, password=None, *, parth_id=None, chirag_id=None,
+          local_host="chirag",
+          episode="01", title="Conversations at the edge of possible",
+          guest_name="Guest", guest_role="In conversation"):
+    if local_host not in ("chirag", "parth"):
+        raise ValueError("local_host must be chirag or parth")
+    remote_host = "parth" if local_host == "chirag" else "chirag"
+    host_ids = {"chirag": chirag_id, "parth": parth_id}
+    if not room or not guest_id or not host_ids[remote_host]:
+        raise ValueError(f"room, guest_id and {remote_host}_id are required")
+    room = check_room(room)
+    guest_id = stream_id(guest_id)
+    host_ids = {name: stream_id(value) for name, value in host_ids.items() if value}
+    ids = [guest_id, *host_ids.values()]
+    if len(set(ids)) != len(ids):
+        raise ValueError("Chirag, Parth and the guest need distinct stream IDs")
+    local_name, remote_name = local_host.title(), remote_host.title()
+    voice_tracks = {"chirag": TRACK_1, "parth": TRACK_4}
     c = Collection()
 
-    # Show-level copy. These are the only strings an operator should need to
-    # touch between episodes; every asset reads them off its URL query string,
-    # so editing one here re-brands every scene at once.
-    SHOW = "THE FRONTIER PODCAST"
-    HOSTS = "CHIRAG PATIL @LORDPATIL  |  GUEST @HANDLE"
-    HEADLINE = "EPISODE 01  //  THE FRONTIER PODCAST"   # the lower-third headline row
-    TAGLINE = "SIGNALS, STORIES, AND THE PEOPLE BUILDING TOMORROW"
-    PRESENTED_BY = "lordpatil.com"
-    # lower_stack.html / outro_card.html split this on "|" and take the first 4.
-    SPONSORS = "lordpatil.com|Dev Drink|Lord Socks|House of Lords"
+    show = "what’s the frontier"
+    hosts = "Chirag & Parth"
+    common = dict(show=show, episode=episode)
+    identity = dict(hosts=hosts, chiragSite="lordpatil.com",
+                    parthSite="parthshastri.co.in")
+    c.source("macos-avcapture", f"CAM · {local_name}")
+    c.source("screen_capture", "SCREEN · Share")
+    c.source("coreaudio_input_capture", f"MIC · {local_name}",
+             mixers=voice_tracks[local_host] | TRACK_6)
 
-    # --- capture sources: settings left empty so OBS opens Properties with
-    # defaults. Encoding device IDs would hardcode absent hardware.
-    c.source("macos-avcapture", "CAM — Me")
-    c.source("screen_capture", "SCREEN — Share")
-
-    c.source("coreaudio_input_capture", "MIC — Me", mixers=TRACK_1 | TRACK_6)
-
-    # --- the remote guest, over WebRTC --------------------------------------
-    # Two separate stream IDs, so camera and screen composite independently.
-    # This is what the old window-capture approach could not do: if the guest
-    # shared inside a call app, their face and their screen were the same
-    # window, and the 3-column layout had nothing to put in two of its columns.
+    # The selected host operates the local studio. Voice track numbers stay
+    # attached to the people, even when local and remote capture swap roles.
     view = dict(room=room, password=password, solo=True,
                 cleanoutput=True, transparent=True)
+    for person, sid, voice, share in (
+        (remote_name, host_ids[remote_host], voice_tracks[remote_host], TRACK_5),
+        ("Guest", guest_id, TRACK_2, TRACK_3),
+    ):
+        c.remote(f"CAM · {person}",
+                 vdo_url(view=sid, videobitrate=2500, **view),
+                 audio_tracks=voice | TRACK_6)
+        c.remote(f"SCREEN · {person} Share",
+                 vdo_url(view=f"{sid}:s", videobitrate=3500, **view),
+                 audio_tracks=share | TRACK_6)
 
-    # Guest mic -> track 2. sync is left at 0 but exposed on purpose: WebRTC
-    # adds 150-400ms that MIC — Me does not, so this is the dial to trim if the
-    # guest sounds late in the mixed track.
-    c.remote("CAM — Guest", vdo_url(view=guest_id, videobitrate=2500, **view),
-             audio_tracks=TRACK_2 | TRACK_6, sync=0)
-
-    # The share is addressed as "<id>:s" -- the default screensharetype=3 exposes
-    # it under that suffix, so the guest needs no extra flags on their link.
-    # Its audio is the guest's *system/tab* audio, not their voice, so it gets
-    # its own track rather than being discarded: if they ever share a video,
-    # track 3 is the only place that sound exists.
-    c.remote("SCREEN — Guest Share",
-             vdo_url(view=f"{guest_id}:s", videobitrate=3500, **view),
-             audio_tracks=TRACK_3 | TRACK_6)
-
-    # --- chrome ---
-    c.browser("BG — Starfield", "starfield_bg.html", CANVAS_W, CANVAS_H)
-    c.browser("UI — Top Bar", "topbar.html", CANVAS_W, TOPBAR_H,
-              show=SHOW, presentedBy=PRESENTED_BY)
-    # NB: lower_stack's "title" is the *headline* row, not the show name.
-    c.browser("UI — Lower Stack", "lower_stack.html", CANVAS_W, LOWER_H,
-              title=HEADLINE, hosts=HOSTS, sponsors=SPONSORS,
-              presentedBy=PRESENTED_BY)
-    c.browser("CARD — Title", "title_card.html", CANVAS_W, CANVAS_H,
-              show=SHOW, tagline=TAGLINE, presentedBy=PRESENTED_BY)
-    c.browser("CARD — Outro", "outro_card.html", CANVAS_W, CANVAS_H,
-              show=SHOW, sponsors=SPONSORS, presentedBy=PRESENTED_BY)
-
-    c.source("color_source_v3", "UI — Cell Border",
-             {"color": CYAN, "width": CANVAS_W, "height": CANVAS_H})
-    c.source("color_source_v3", "BG — Void",
+    c.browser("BG · Starfield", "starfield_bg.html", CANVAS_W, CANVAS_H)
+    c.browser("UI · Top Bar", "topbar.html", CANVAS_W, TOPBAR_H, **common)
+    c.browser("UI · Lower Stack", "lower_stack.html", CANVAS_W, LOWER_H,
+              title=title, **identity, episode=episode)
+    c.browser("CARD · Title", "title_card.html", CANVAS_W, CANVAS_H,
+              status="Starting soon", **common, **identity)
+    c.browser("CARD · Break", "title_card.html", CANVAS_W, CANVAS_H,
+              status="Back shortly", **common, **identity)
+    c.browser("CARD · Outro", "outro_card.html", CANVAS_W, CANVAS_H,
+              thanks="Stay curious.", **common,
+              chiragSite=identity["chiragSite"], parthSite=identity["parthSite"])
+    c.source("color_source_v3", "UI · Cell Border",
+             {"color": SPECTRAL, "width": CANVAS_W, "height": CANVAS_H})
+    c.source("color_source_v3", "BG · Void",
              {"color": VOID, "width": CANVAS_W, "height": CANVAS_H})
 
     full = (0, 0, CANVAS_W, CANVAS_H)
 
     def chrome():
-        """Persistent furniture, listed top-first, shared by every live scene."""
         return [
-            c.item("UI — Top Bar", 0, 0, CANVAS_W, TOPBAR_H),
-            c.item("UI — Lower Stack", 0, CANVAS_H - LOWER_H, CANVAS_W, LOWER_H),
+            c.item("UI · Top Bar", 0, 0, CANVAS_W, TOPBAR_H),
+            c.item("UI · Lower Stack", 0, CANVAS_H - LOWER_H, CANVAS_W, LOWER_H),
         ]
 
-    def backing():
-        return [c.item("BG — Starfield", *full), c.item("BG — Void", *full)]
-
-    def carriers():
-        """Bottom of every scene, under the opaque backing. See CARRIER above:
-        this is what stops the guest's audio from dropping out on a cut to a
-        scene that has no guest cell."""
-        return c.carrier("CAM — Guest") + c.carrier("SCREEN — Guest Share")
-
     def layers(*groups):
-        """Top-first: content, then backing, then the silent audio carriers."""
-        return [it for g in groups for it in g] + backing() + carriers()
+        items = [it for group in groups for it in group]
+        items += [c.item("BG · Starfield", *full), c.item("BG · Void", *full)]
+        # Local mic must also be referenced by each scene. Sources that only
+        # exist in the collection are not automatically global audio devices.
+        for name in (f"MIC · {local_name}", f"CAM · {remote_name}",
+                     f"SCREEN · {remote_name} Share",
+                     "CAM · Guest", "SCREEN · Guest Share"):
+            items += c.carrier(name)
+        return items
 
-    # One slot, two possible screens. Scenes 05/06/08 reference this nested
-    # scene instead of a screen source directly, so switching between "my
-    # screen" and "the guest's screen" is one visibility toggle in one place
-    # rather than a parallel set of duplicated scenes and hotkeys. Toggling
-    # inside the slot is also safe: it does not reload either page, whereas
-    # duplicating the source across scenes would renegotiate the WebRTC
-    # connection on every cut.
-    c.scene("SLOT — Content", [
-        c.item("SCREEN — Guest Share", *full, fill=True, visible=False, role=SLOT),
-        c.item("SCREEN — Share", *full, fill=True, role=SLOT),
+    people = {
+        "Chirag": ("Chirag", "Co-host", "lordpatil.com"),
+        "Parth": ("Parth", "Co-host", "parthshastri.co.in"),
+        "Guest": (guest_name, guest_role, ""),
+    }
+
+    def camera(person, x, y, w, h):
+        # Each browser label is rendered at its composited size so smaller
+        # screen-sharing rails do not shrink or blur the names.
+        lw, lh = min(w - 32, 560), 64
+        label = f"UI · {person} Label {lw}"
+        if label not in c.by_name:
+            name, role, website = people[person]
+            c.browser(label, "participant_label.html", lw, lh,
+                      name=name, role=role, website=website, person=person.lower())
+        return [c.item(label, x + 16, y + h - lh - 16, lw, lh)] + c.cell(
+            f"CAM · {person}", x, y, w, h)
+
+    # One source slot for the operator, cohost or guest screen. Only one item
+    # is visible by default. Switching this slot does not reconnect WebRTC.
+    c.scene("SLOT · Content", [
+        c.item("SCREEN · Guest Share", *full, visible=False, role=SLOT),
+        c.item(f"SCREEN · {remote_name} Share", *full, visible=False, role=SLOT),
+        c.item("SCREEN · Share", *full, role=SLOT),
     ], custom_size=True)
 
-    # --- geometry -----------------------------------------------------------
-    # 2-up: two equal cells filling the band width.
-    two_w = (CANVAS_W - MARGIN * 2 - GAP) // 2
-    two_h = BAND_H
-    two_y = BAND_Y
+    width = CANVAS_W - MARGIN * 2
+    duo_w = (width - GAP) // 2
+    trio_w = (width - GAP * 2) // 3
 
-    # 3-column: centre content sized 16:9 to the band height, side rails split
-    # the remainder. Keeps shared text large enough to actually read.
-    ctr_h = BAND_H
-    ctr_w = round(ctr_h * 16 / 9)
-    rail_w = (CANVAS_W - MARGIN * 2 - GAP * 2 - ctr_w) // 2
-    rail_h = round(rail_w * 9 / 16)
-    rail_y = BAND_Y + (BAND_H - rail_h) // 2
-    ctr_x = MARGIN + rail_w + GAP
+    def duo():
+        return (camera("Chirag", MARGIN, BAND_Y, duo_w, BAND_H) +
+                camera("Parth", MARGIN + duo_w + GAP, BAND_Y, duo_w, BAND_H))
 
-    # Solo: one cell spanning the band.
-    solo_w = CANVAS_W - MARGIN * 2
+    def screen_with_duo():
+        # Use readable host cards centered in the side rails, reserving clear
+        # space so they never cover the centred share.
+        card_w, card_h = 320, 240
+        content_w = CANVAS_W - MARGIN * 2 - GAP * 2 - card_w * 2
+        content_h = round(content_w * 9 / 16)
+        content_x = (CANVAS_W - content_w) // 2
+        content_y = BAND_Y + (BAND_H - content_h) // 2
+        left_x = MARGIN
+        right_x = CANVAS_W - MARGIN - card_w
+        center_y = BAND_Y + (BAND_H - card_h) // 2
+        items = c.cell("SLOT · Content", content_x, content_y,
+                       content_w, content_h, fill=False)
+        for name, (x, y) in zip(("Chirag", "Parth"),
+                                ((left_x, center_y), (right_x, center_y))):
+            items += camera(name, x, y, card_w, card_h)
+        return items
 
-    # Over/under: stacked for vertical clips. The band only leaves ~303px per
-    # cell, and a 16:9 cell that short would be 539px wide -- narrower than the
-    # 607.5px 9:16 safe zone of a 1080-tall canvas, so a vertical crop would
-    # slice both faces. Widen the cells past the safe zone instead and let
-    # scale-outer crop the feed vertically; two wide strips stacked is the
-    # standard shape for vertical podcast clips anyway.
-    SAFE_9X16 = CANVAS_H * 9 / 16          # 607.5
-    ou_h = (BAND_H - GAP) // 2
-    ou_w = round(SAFE_9X16) + 32           # margin past the safe zone
-    ou_x = (CANVAS_W - ou_w) // 2
+    def screen_with_trio():
+        # A screen-led three-person view: retain the original vertical people
+        # rail and give the share the entire left side of the broadcast band.
+        content_h = BAND_H
+        content_w = round(content_h * 16 / 9)
+        content_x, content_y = MARGIN, BAND_Y
+        rail_x = content_x + content_w + GAP
+        rail_w = CANVAS_W - MARGIN - rail_x
+        card_h = (BAND_H - GAP * 2) // 3
+        items = c.cell("SLOT · Content", content_x, content_y,
+                       content_w, content_h, fill=False)
+        for index, name in enumerate(("Chirag", "Parth", "Guest")):
+            items += camera(name, rail_x, BAND_Y + index * (card_h + GAP),
+                            rail_w, card_h)
+        return items
 
-    c.scene("01 Intro", layers([c.item("CARD — Title", *full)]), "OBS_KEY_F1")
-
-    c.scene("02 Solo — Me",
-            layers(chrome(), c.cell("CAM — Me", MARGIN, BAND_Y, solo_w, BAND_H)),
+    c.scene("01 Standby", layers([c.item("CARD · Title", *full)]), "OBS_KEY_F1")
+    c.scene("02 Solo · Chirag",
+            layers(chrome(), camera("Chirag", MARGIN, BAND_Y, width, BAND_H)),
             "OBS_KEY_F2")
-
-    c.scene("03 Solo — Guest",
-            layers(chrome(),
-                   c.cell("CAM — Guest", MARGIN, BAND_Y, solo_w, BAND_H)),
+    c.scene("03 Solo · Parth",
+            layers(chrome(), camera("Parth", MARGIN, BAND_Y, width, BAND_H)),
             "OBS_KEY_F3")
-
-    c.scene("04 Two Shot",
-            layers(chrome(),
-                   c.cell("CAM — Me", MARGIN, two_y, two_w, two_h),
-                   c.cell("CAM — Guest",
-                          MARGIN + two_w + GAP, two_y, two_w, two_h)),
-            "OBS_KEY_F4")
-
-    # Guest left, content centre, host right — the layout that keeps shared
-    # text readable, unlike a corner picture-in-picture. The centre is the
-    # content slot, so it shows whichever screen is live in SLOT — Content.
-    c.scene("05 Screen — 3 Column",
-            layers(chrome(),
-                   c.cell("CAM — Guest", MARGIN, rail_y, rail_w, rail_h),
-                   c.cell("SLOT — Content", ctr_x, BAND_Y, ctr_w, ctr_h),
-                   c.cell("CAM — Me", ctr_x + ctr_w + GAP, rail_y, rail_w, rail_h)),
+    c.scene("04 Duo", layers(chrome(), duo()), "OBS_KEY_F4")
+    c.scene("05 Screen · Duo",
+            layers(chrome(), screen_with_duo()),
             "OBS_KEY_F5")
-
     c.scene("06 Screen Full",
-            layers(chrome(),
-                   c.cell("SLOT — Content", MARGIN, BAND_Y, solo_w, BAND_H)),
-            "OBS_KEY_F6")
-
-    # Screen plus guest only: for when the guest is driving the demo.
-    scr_w = CANVAS_W - MARGIN * 2 - GAP - rail_w
-    c.scene("08 Screen + Guest",
-            layers(chrome(),
-                   c.cell("SLOT — Content", MARGIN, BAND_Y, scr_w, BAND_H),
-                   c.cell("CAM — Guest",
-                          MARGIN + scr_w + GAP, rail_y, rail_w, rail_h)),
+            layers(chrome(), c.cell("SLOT · Content", MARGIN, BAND_Y,
+                                   width, BAND_H, fill=False)), "OBS_KEY_F6")
+    trio = []
+    for index, name in enumerate(("Chirag", "Guest", "Parth")):
+        trio += camera(name, MARGIN + index * (trio_w + GAP), BAND_Y,
+                       trio_w, BAND_H)
+    c.scene("07 Trio · With Guest", layers(chrome(), trio), "OBS_KEY_F7")
+    c.scene("08 Screen · Trio",
+            layers(chrome(), screen_with_trio()),
             "OBS_KEY_F8")
+    ou_h = (BAND_H - GAP) // 2
+    ou_w = round(CANVAS_H * 9 / 16) + 32
+    ou_x = (CANVAS_W - ou_w) // 2
+    c.scene("09 Duo · Vertical", layers(
+        chrome(), camera("Chirag", ou_x, BAND_Y, ou_w, ou_h),
+        camera("Parth", ou_x, BAND_Y + ou_h + GAP, ou_w, ou_h)),
+        "OBS_KEY_F9")
+    c.scene("10 Outro", layers([c.item("CARD · Outro", *full)]), "OBS_KEY_F10")
+    c.scene("11 Solo · Guest",
+            layers(chrome(), camera("Guest", MARGIN, BAND_Y, width, BAND_H)),
+            "OBS_KEY_F11")
+    c.scene("12 Break", layers([c.item("CARD · Break", *full)]), "OBS_KEY_F12")
 
-    c.scene("09 Two Shot — Over/Under",
-            layers(chrome(),
-                   c.cell("CAM — Me", ou_x, BAND_Y, ou_w, ou_h),
-                   c.cell("CAM — Guest", ou_x, BAND_Y + ou_h + GAP, ou_w, ou_h)),
-            "OBS_KEY_F9")
-
-    c.scene("10 Outro", layers([c.item("CARD — Outro", *full)]), "OBS_KEY_F10")
-
-    first = c.scene_order[0]["name"]
     return {
-        "name": COLLECTION_NAME,
-        "current_scene": first, "current_program_scene": first,
+        "name": f"{COLLECTION_NAME} · {local_name} local",
+        "current_scene": "04 Duo", "current_program_scene": "04 Duo",
         "current_transition": "Fade", "transition_duration": 300,
         "transitions": [], "quick_transitions": [],
         "scene_order": c.scene_order, "sources": c.sources,
@@ -493,40 +507,56 @@ def build(room, guest_id, password=None):
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(
-        description="Generate the Frontier Podcast OBS scene collection.")
+    ap = argparse.ArgumentParser(description="Generate the WTF duo podcast studio.")
     ap.add_argument("-o", "--output", default="podcast_scenes.json")
-    ap.add_argument("--guest-link", action="store_true",
-                    help="print the link to send the guest, and exit")
+    modes = ap.add_mutually_exclusive_group()
+    modes.add_argument("--local-host", choices=("chirag", "parth"), default="chirag",
+                       help="choose whose camera and microphone are local")
+    modes.add_argument("--both-local-hosts", action="store_true",
+                       help="generate both collections for selection in OBS")
+    links = ap.add_mutually_exclusive_group()
+    links.add_argument("--guest-link", action="store_true", help="print the guest invitation")
+    links.add_argument("--parth-link", action="store_true", help="print Parth's invitation")
+    links.add_argument("--chirag-link", action="store_true", help="print Chirag's invitation")
+    ap.add_argument("--episode", default="01")
+    ap.add_argument("--title", default="Conversations at the edge of possible")
+    ap.add_argument("--guest-name", default="Guest")
+    ap.add_argument("--guest-role", default="In conversation")
     args = ap.parse_args()
-
-    # Deliberately no defaults. A vdo.ninja room is unauthenticated: anyone who
-    # knows the name can walk into the recording. A placeholder default would
-    # let a typo'd or unset variable produce a *successful* build pointing at a
-    # real, guessable, public room -- a silent misconfiguration that is far
-    # worse than a crash. So: fail loudly instead.
     room = os.environ.get("VDO_ROOM")
     guest = os.environ.get("VDO_GUEST_ID")
-    password = os.environ.get("VDO_PASSWORD")     # optional but strongly advised
-    missing = [n for n, v in (("VDO_ROOM", room), ("VDO_GUEST_ID", guest)) if not v]
+    parth = os.environ.get("VDO_PARTH_ID")
+    chirag = os.environ.get("VDO_CHIRAG_ID")
+    password = os.environ.get("VDO_PASSWORD")
+    required = [("VDO_ROOM", room)]
+    invitation = ("guest" if args.guest_link else "parth" if args.parth_link
+                  else "chirag" if args.chirag_link else None)
+    if invitation and args.both_local_hosts:
+        ap.error("generate collections or print an invitation in separate commands")
+    ids = {"guest": guest, "parth": parth, "chirag": chirag}
+    local_hosts = ("chirag", "parth") if args.both_local_hosts else (args.local_host,)
+    needed = [invitation] if invitation else [
+        "guest", *("parth" if host == "chirag" else "chirag" for host in local_hosts)]
+    required.extend((f"VDO_{person.upper()}_ID", ids[person]) for person in needed)
+    missing = [name for name, value in required if not value]
     if missing:
-        sys.exit(
-            f"error: {' and '.join(missing)} not set.\n"
-            "  These identify your private vdo.ninja room and must not be\n"
-            "  committed, so they are read from the environment:\n\n"
-            # No hyphens: vdo.ninja rewrites them to _ inside a stream id and
-            # leaves rooms undefined. stream_id()/check_room() enforce this,
-            # but generating clean values means never hitting either.
-            "    export VDO_ROOM=frontier$(openssl rand -hex 4)\n"
-            "    export VDO_GUEST_ID=guest$(openssl rand -hex 4)\n"
-            "    export VDO_PASSWORD=$(openssl rand -hex 12)   # optional\n")
-
-    if args.guest_link:
-        print(guest_link(room, guest, password))
-        sys.exit(0)
-
-    with open(args.output, "w") as f:
-        json.dump(build(room, guest, password), f, indent=4)
-    # The written JSON contains the resolved room URLs in plaintext. It is a
-    # secret artifact in the same way the env vars are; do not commit it.
-    print(f"wrote {args.output}")
+        ap.error(f"{', '.join(missing)} not set. See .env.example for setup.")
+    try:
+        if invitation:
+            print(guest_link(room, ids[invitation], password))
+        else:
+            # Validate both variants before writing either file.
+            collections = [(host, build(
+                room, guest, password, parth_id=parth, chirag_id=chirag,
+                local_host=host, episode=args.episode, title=args.title,
+                guest_name=args.guest_name, guest_role=args.guest_role))
+                for host in local_hosts]
+            output = Path(args.output)
+            for host, result in collections:
+                target = output.with_name(f"{output.stem}_{host}_local{output.suffix}") \
+                    if args.both_local_hosts else output
+                with target.open("w") as f:
+                    json.dump(result, f, indent=4)
+                print(f"wrote {target} ({result['name']})")
+    except ValueError as exc:
+        ap.error(str(exc))

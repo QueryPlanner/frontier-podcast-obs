@@ -1,0 +1,7 @@
+{
+  "name": "wtf-obs-studio",
+  "private": true,
+  "description": "Browser verification for the WTF podcast overlays",
+  "scripts": { "test": "node --test test_render.cjs" },
+  "devDependencies": { "playwright": "1.63.0", "pngjs": "7.0.0" }
+}

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WTF · Studio preview</title>
+<style>
+@font-face {font-family:Anybody;src:url(../assets/fonts/Anybody.ttf)}
+*{box-sizing:border-box}body{margin:0;background:#07080D;color:#F2EBDD;font-family:Anybody,sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 3vw;border-bottom:1px solid #F2EBDD26}
+h1{font-size:20px;margin:0}p{margin:0;font-size:13px;color:#B8B3B0}
+select{min-height:44px;padding:8px 16px;font:16px Anybody;background:#162752;color:#F2EBDD;border:1px solid #8B7CFF}
+.viewport{position:relative;margin:24px auto;width:min(94vw,1920px);aspect-ratio:16/9;overflow:hidden;box-shadow:0 0 0 1px #F2EBDD26}
+.stage{width:1920px;height:1080px;transform-origin:0 0;position:absolute;overflow:hidden}
+.item{position:absolute;border:0;overflow:hidden}
+.camera{background:radial-gradient(ellipse at 50% 26%,#343953,#121620 62%);display:flex;align-items:center;justify-content:center;isolation:isolate}
+.camera.parth{background:radial-gradient(ellipse at 50% 26%,#58473C,#171519 62%)}
+.camera.guest{background:radial-gradient(ellipse at 50% 26%,#3C3A60,#151321 62%)}
+.camera::before{content:"";position:absolute;width:24%;aspect-ratio:.8;border-radius:50%;background:#F2EBDD10;top:20%;z-index:-1}
+.camera::after{content:"";position:absolute;width:70%;height:70%;border-radius:48% 48% 0 0;background:linear-gradient(#F2EBDD0A,transparent);top:52%;z-index:-1}
+.placeholder{text-align:center;color:#F2EBDD70;font-size:20px;letter-spacing:.08em}
+.placeholder small{display:block;margin-top:10px;font-size:12px;text-transform:uppercase}
+.screen{background:#F2EBDD;color:#07080D;padding:8%;display:flex;flex-direction:column;justify-content:center;gap:32px;font-size:64px;font-weight:650}
+.screen small{font-size:16px;font-weight:400;text-transform:uppercase;letter-spacing:.12em}
+footer{padding:0 3vw 24px;font-size:13px;color:#B8B3B0}a{color:#F2EBDD}
+@media(max-width:700px){header{flex-wrap:wrap}h1{font-size:18px}}
+</style>
+</head>
+<body>
+<header><div><h1>WTF studio preview</h1><p>Actual scene geometry with illustrative camera placeholders</p></div><label>Collection <select id="local-host" aria-label="Local host"><option value="chirag">WTF · Chirag local</option><option value="parth">WTF · Parth local</option></select></label><label>Scene <select id="scene" aria-label="Scene"></select></label></header>
+<main class="viewport"><div class="stage" id="stage"></div></main>
+<footer>The duo is the default. F1 through F12 switch scenes. These previews do not connect to cameras, microphones or remote feeds.</footer>
+<script>
+const collections=__COLLECTION_DATA__;
+let scenes=collections.chirag;
+const picker=document.getElementById('scene'),stage=document.getElementById('stage');
+for(const scene of scenes){const option=document.createElement('option');option.value=scene.name;option.textContent=scene.name;picker.append(option)}
+function show(name){
+  stage.replaceChildren();picker.value=name;
+  for(const item of scenes.find(s=>s.name===name).items){
+    const el=document.createElement(item.url?'iframe':'div');el.className='item';
+    Object.assign(el.style,{left:item.x+'px',top:item.y+'px',width:item.w+'px',height:item.h+'px'});
+    if(item.url){el.src=item.url;el.title=item.name}
+    else if(item.color)el.style.background=item.color;
+    else if(item.name.startsWith('CAM')){
+      const person=item.name.split(' · ')[1];el.classList.add('camera',person.toLowerCase());
+      const copy=document.createElement('div');copy.className='placeholder';copy.textContent=person;
+      const note=document.createElement('small');note.textContent=item.capture+' preview';copy.append(note);el.append(copy);
+    }else{el.classList.add('screen');const label=document.createElement('small');label.textContent='Shared content preview';const copy=document.createElement('div');copy.textContent='A window into what comes next.';el.append(label,copy)}
+    stage.append(el);
+  }
+}
+picker.addEventListener('change',()=>show(picker.value));
+document.getElementById('local-host').addEventListener('change',event=>{scenes=collections[event.target.value];show('04 Duo')});
+document.addEventListener('keydown',e=>{const i=Number(e.key.slice(1))-1;if(/^F\d+$/.test(e.key)&&scenes[i]){e.preventDefault();show(scenes[i].name)}});
+new ResizeObserver(()=>stage.style.transform='scale('+stage.parentElement.clientWidth/1920+')').observe(stage.parentElement);
+show('04 Duo');
+</script>
+</body>
+</html>

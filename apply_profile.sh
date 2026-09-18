@@ -24,10 +24,8 @@ echo "backed up -> $BACKUP"
 
 # Apple VT H264 Hardware Encoder, ID read from this machine's OBS log.
 ENC="com.apple.videotoolbox.videoencoder.ave.avc"
-# Audio track bitmask. 1 = my mic, 2 = the guest's voice, 3 = audio from
-# whatever the guest shares, 6 = a safety mix of all three.
-# 1 | 2 | 4 | 32 = 39
-TRACKS=39
+# Tracks: Chirag, guest, guest share, Parth, remote host share, safety mix.
+TRACKS=63
 
 python3 - "$INI" "$ENC" "$TRACKS" <<'PY'
 import configparser, sys
@@ -45,7 +43,9 @@ changes = {
                 "RecAudioEncoder": "CoreAudio_AAC",
                 "RecType": "Standard"},
     # FPSType=0 means "common FPS", whose value lives in FPSCommon.
-    "Video":   {"FPSType": "0", "FPSCommon": "30"},
+    "Video":   {"FPSType": "0", "FPSCommon": "30",
+                "BaseCX": "1920", "BaseCY": "1080",
+                "OutputCX": "1920", "OutputCY": "1080"},
     "Audio":   {"SampleRate": "48000"},
 }
 
@@ -66,4 +66,4 @@ PY
 echo
 echo "Done. Reopen OBS, then set by hand (encoder options are not in basic.ini):"
 echo "  Settings > Output > Recording > Rate Control: CRF, CRF 18"
-echo "  Settings > Output > Recording > check Audio Tracks 1, 2, 3 and 6"
+echo "  Settings > Output > Recording > check all six Audio Tracks"

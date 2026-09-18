@@ -1,72 +1,42 @@
-# The Frontier Podcast — guest setup
+# What’s the Frontier · Remote participant setup
 
-Nothing to install. You need **Chrome or Edge** on a **laptop or desktop**, plus
-wired **headphones**.
+Chirag and Parth host the podcast. Either host can run the local studio. The
+other host and the guest each use their own invitation link.
 
-Please don't substitute another browser, even a Chromium-based one:
+Use Chrome or Edge on a laptop or desktop with wired headphones. The studio
+will send your private link. Copy it exactly: the stream ID connects your
+camera to the correct named source in OBS.
 
-- **Brave** blocks parts of the camera API by default (Shields), so you can join
-  the room and appear to be connected while sending no video at all.
-- **Safari and Firefox** can't reliably do the local recording this setup relies on.
-- **A phone won't work.** Every iOS browser — including "Chrome" — is Safari
-  underneath, and the local recording is lost the moment the screen locks or a
-  call comes in.
+## Before the recording
 
-Chirag will send you a link that looks like this:
+1. Connect headphones and check the selected camera and microphone.
+2. Prefer wired ethernet, or sit close to the router.
+3. Close other apps using the camera and pause large downloads.
+4. Leave several gigabytes free for the local recording.
+5. Open your invitation and allow camera and microphone access.
+6. Confirm with the hosts that they can see and hear you before starting.
 
-```
-https://vdo.ninja/?room=ROOM&push=guestXXXXXXXX&password=PW&record=6000
-```
+Your invitation requests a local recording in addition to the live stream.
+Confirm the browser’s recording indicator is active and approve any file
+permission prompt. A short test recording verifies where the browser saves it.
 
-Don't edit it, and don't retype it — copy and paste. The `push=` part is how
-the studio finds your camera. If even one character differs, you appear as a
-black box and **nothing reports an error** on either end.
+## During the conversation
 
-## Before we start
+Clap once when the hosts ask. That gives the editor a synchronization point
+between the local recordings.
 
-1. **Headphones.** Not optional. Speakers put my voice back into your mic and
-   there's no fixing that afterwards.
-2. **Wired ethernet** if you can. Failing that, sit close to the router.
-3. **Quit everything else.** Especially anything else using the camera, and
-   anything syncing in the background.
-4. **Check your disk.** The local recording runs about **45 MB per minute**, so
-   a 90-minute episode needs ~4 GB free.
+Use the screen-share control if you want to show something. Sharing a window
+keeps unrelated desktop content out of the show. Camera and screen are
+separate sources, so your camera can stay visible while you share.
 
-## Recording
+Wear headphones throughout. The local host’s director tab handles the conversation
+audio; OBS records the separate stems.
 
-When you open the link, allow camera and mic, then confirm you can see yourself.
+## Before leaving
 
-Your browser records a **full-quality local copy** to your Downloads folder at
-the same time as it streams to me. The stream is compressed to survive the
-network; the local file isn't. That local file is what actually gets used, so
-the episode's quality doesn't depend on your connection holding up.
+Stop and save the local recording before closing the page. Confirm the file
+exists and plays back, then send it through the transfer method agreed with
+the hosts.
 
-Two things that will cost us the recording if you get them wrong:
-
-- **Stop the recording before you hang up**, using the button on the page.
-- **Don't force-quit the browser** while it's recording. The file is still
-  being written and won't be readable.
-
-At the very start I'll ask you to **clap once**. That's the sync point for
-lining your local file up with mine in the edit — please don't skip it.
-
-## Sharing your screen
-
-Press the screen-share button on the VDO.Ninja page. Share **one window**, not
-your whole desktop — notifications, tabs and your dock all end up on camera
-otherwise.
-
-Your screen arrives as a separate feed from your camera, so I can put your face
-and your screen side by side rather than having to choose. Nothing extra for
-you to do; just start the share and I'll switch to it.
-
-## Afterwards
-
-Send me the file from your Downloads folder. It'll be a `.webm`. If it's too
-big to email, any file-transfer link is fine.
-
-## If something goes wrong mid-recording
-
-Reload the page. You'll reconnect to the same room automatically and I'll still
-have everything up to that point — **but reloading starts a new local recording
-file**, so send me *all* of them, not just the last one.
+If you reconnect or reload, keep every recording segment. A reload can start
+a new file, and the editor may need all of them.
