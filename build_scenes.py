@@ -228,7 +228,15 @@ class Collection:
             "scale_ref": {"x": float(CANVAS_W), "y": float(CANVAS_H)},
             "align": 5,
             "bounds_type": 3 if fill else 2,
-            "bounds_align": 0, "bounds_crop": False,
+            # bounds_crop is OBS's "Crop to Bounding Box". Without it, a
+            # scale-outer item is scaled to *cover* its box and the overflow is
+            # still drawn -- OBS bounds position and scale, they do not clip.
+            # A 16:9 camera in a 2.41:1 cell then bleeds ~135px above and below
+            # its cell, over the top bar and into the lower stack, while the
+            # selection rectangle in the preview stays exactly where it should.
+            # That is what makes it read as a layout bug rather than a fill
+            # mode: every number is right and the picture is still wrong.
+            "bounds_align": 0, "bounds_crop": fill,
             "crop_left": 0, "crop_top": 0, "crop_right": 0, "crop_bottom": 0,
             "id": 0, "group_item_backup": False,
             "pos": {"x": float(x), "y": float(y)}, "pos_rel": pos_rel(x, y),

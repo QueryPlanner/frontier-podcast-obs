@@ -209,6 +209,59 @@ class TestGeometry(unittest.TestCase):
         self.assertEqual(by_name["CAM · Guest"], (1416.0, 632.0, 1872.0, 868.0))
 
 
+class TestBoundsCropping(unittest.TestCase):
+    """A scale-outer item that is not cropped to its bounds overflows them.
+
+    OBS bounding boxes position and scale a source; they do not clip it. With
+    "Crop to Bounding Box" off, scale-outer covers the box and draws the
+    overflow anyway, so a 16:9 camera in a wide cell bleeds over the top bar
+    and into the lower stack. Every geometry assertion still passes, because
+    the item's pos and bounds are exactly right -- only the pixels are wrong.
+    These tests exist because that shipped and was caught by eye, on air."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.col = collection()
+
+    def test_every_filled_item_is_cropped_to_its_bounds(self):
+        for scene in scenes(self.col):
+            for it in scene["settings"]["items"]:
+                if it["bounds_type"] == 3:
+                    with self.subTest(scene=scene["name"], item=it["name"]):
+                        self.assertTrue(
+                            it["bounds_crop"],
+                            f"{it['name']} fills its box but is not cropped to "
+                            "it, so it will overflow into neighbouring cells")
+
+    def test_fitted_items_are_not_cropped(self):
+        """scale-inner already fits inside the box; cropping it would be a
+        no-op that quietly hides a future aspect-ratio mistake."""
+        for scene in scenes(self.col):
+            for it in scene["settings"]["items"]:
+                if it["bounds_type"] == 2:
+                    with self.subTest(scene=scene["name"], item=it["name"]):
+                        self.assertFalse(it["bounds_crop"])
+
+    def test_a_wide_cell_would_overflow_a_16_9_feed_uncropped(self):
+        """Grounds the rule in arithmetic rather than a magic boolean: show
+        that the overflow is real and large for the cells actually used."""
+        for scene in scenes(self.col):
+            for it in cells(scene):
+                if it["bounds_type"] != 3:
+                    continue      # scale-inner letterboxes; it cannot overflow
+                w, h = it["bounds"]["x"], it["bounds"]["y"]
+                cam_w, cam_h = 1280, 720          # a common webcam mode
+                scale = max(w / cam_w, h / cam_h)  # scale-outer covers the box
+                drawn_h, drawn_w = cam_h * scale, cam_w * scale
+                overflow = max(drawn_h - h, drawn_w - w)
+                if overflow > 1:
+                    with self.subTest(scene=scene["name"], item=it["name"]):
+                        self.assertTrue(
+                            it["bounds_crop"],
+                            f"{it['name']} would draw {overflow:.0f}px outside "
+                            f"its {w:.0f}x{h:.0f} box without cropping")
+
+
 class TestSchema(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
