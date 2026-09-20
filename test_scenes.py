@@ -1,14 +1,7 @@
 #!/usr/bin/env python3
 """
-Tests for the Frontier Podcast OBS scene collection and its HTML assets.
-
-Two layers:
-
-  * Geometry / schema tests run against the in-memory output of build(), so
-    they never depend on a stale podcast_scenes.json on disk.
-  * Render tests drive headless Chrome against the real asset files and assert
-    on actual pixels. They skip (not fail) when Chrome is absent, so the
-    geometry suite still runs on a machine without it.
+Tests for the WTF OBS collection, geometry, identity wiring and audio routing.
+Browser rendering is verified separately by test_render.cjs.
 
 Run:  python3 test_scenes.py
 """
@@ -16,6 +9,7 @@ Run:  python3 test_scenes.py
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from urllib.parse import urlparse, parse_qs, unquote
@@ -26,30 +20,29 @@ from build_scenes import (
     MARGIN, GAP, BORDER, CARRIER, build, guest_link, stream_id, check_room,
 )
 
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-
 # Fixtures, not real credentials. build() takes these as arguments precisely so
 # the tests never depend on the operator's actual room being in the environment.
 # Alphanumeric on purpose: these used to be "test-room"/"test-guest", which is
 # the very shape vdo.ninja silently rewrites. See TestIdentifierSanitising.
 ROOM, GUEST_ID, PASSWORD = "testroom", "testguest", "test-pw"
+PARTH_ID = "testparth"
 
 # Cells that hold a live video feed. Chrome (top bar, lower stack, cards) and
 # the full-canvas backing layers are deliberately allowed outside the band.
-# SLOT — Content is a nested scene, but it is composited exactly like a feed.
-FEEDS = {"CAM — Me", "CAM — Guest", "SLOT — Content"}
-BAND_ITEMS = FEEDS | {"UI — Cell Border"}
+# SLOT · Content is a nested scene, but it is composited exactly like a feed.
+FEEDS = {"CAM · Chirag", "CAM · Parth", "CAM · Guest", "SLOT · Content"}
+BAND_ITEMS = FEEDS | {"UI · Cell Border"}
 
 # Browser sources whose URL is a remote WebRTC feed rather than a local asset.
-REMOTE = {"CAM — Guest", "SCREEN — Guest Share"}
+REMOTE = {"CAM · Guest", "SCREEN · Guest Share", "CAM · Parth", "SCREEN · Parth Share"}
 
 # The slot is a source container, never something you cut to, so it is exempt
 # from the layout rules that govern on-air scenes.
-SLOT_SCENE = "SLOT — Content"
+SLOT_SCENE = "SLOT · Content"
 
 
 def collection():
-    return build(ROOM, GUEST_ID, PASSWORD)
+    return build(ROOM, GUEST_ID, PASSWORD, parth_id=PARTH_ID)
 
 
 def scenes(col):
@@ -85,9 +78,9 @@ class TestGeometry(unittest.TestCase):
 
     def test_band_arithmetic(self):
         """The middle band must not collide with the top strip or lower block."""
-        self.assertEqual(BAND_Y, TOPBAR_H + 8)
-        self.assertEqual(BAND_H, 614)
-        self.assertEqual(BAND_Y + BAND_H, CANVAS_H - LOWER_H - 8)
+        self.assertEqual(BAND_Y, TOPBAR_H + 16)
+        self.assertEqual(BAND_H, 756)
+        self.assertEqual(BAND_Y + BAND_H, CANVAS_H - LOWER_H - 16)
 
     def test_every_item_inside_canvas(self):
         for sc in self.scenes:
@@ -143,7 +136,7 @@ class TestGeometry(unittest.TestCase):
             for i, (n, it) in enumerate(zip(names, items)):
                 if id(it) in cell_ids:
                     borders_below = [j for j, m in enumerate(names)
-                                     if m == "UI — Cell Border" and j < i]
+                                     if m == "UI · Cell Border" and j < i]
                     self.assertTrue(
                         borders_below,
                         f'{sc["name"]}: feed {n} has no border beneath it')
@@ -152,7 +145,7 @@ class TestGeometry(unittest.TestCase):
         for sc in self.scenes:
             items = sc["settings"]["items"]
             feeds = cells(sc)
-            borders = [it for it in items if it["name"] == "UI — Cell Border"]
+            borders = [it for it in items if it["name"] == "UI · Cell Border"]
             self.assertEqual(len(feeds), len(borders), sc["name"])
             for f in feeds:
                 fx0, fy0, fx1, fy1 = box(f)
@@ -168,7 +161,7 @@ class TestGeometry(unittest.TestCase):
         be a sign the item was not laid out as intended."""
         for sc in self.scenes:
             for it in sc["settings"]["items"]:
-                live = (it["name"] in FEEDS
+                live = (it["name"] in FEEDS - {"SLOT · Content"}
                         or it["private_settings"].get("frontier_role") == CARRIER)
                 want = 3 if live else 2
                 self.assertEqual(it["bounds_type"], want,
@@ -192,7 +185,7 @@ class TestGeometry(unittest.TestCase):
         Both stacked cells must span that whole window or faces get sliced."""
         safe = CANVAS_H * 9 / 16
         lo, hi = (CANVAS_W - safe) / 2, (CANVAS_W + safe) / 2
-        sc = next(s for s in self.scenes if s["name"] == "09 Two Shot — Over/Under")
+        sc = next(s for s in self.scenes if s["name"] == "09 Duo · Vertical")
         feeds = cells(sc)
         self.assertEqual(len(feeds), 2)
         for f in feeds:
@@ -200,19 +193,73 @@ class TestGeometry(unittest.TestCase):
             self.assertLessEqual(x0, lo, f'{f["name"]} left edge {x0} inside safe zone {lo}')
             self.assertGreaterEqual(x1, hi, f'{f["name"]} right edge {x1} inside safe zone {hi}')
 
-    def test_three_column_keeps_content_largest(self):
-        """The point of the 3-column layout is that shared content stays big.
-        If a side rail ever gets wider than the centre, the layout has drifted."""
-        sc = next(s for s in self.scenes if s["name"] == "05 Screen — 3 Column")
-        by_name = {}
-        for it in cells(sc):
-            by_name.setdefault(it["name"], []).append(box(it))
-        screen = by_name["SLOT — Content"][0]
-        screen_w = screen[2] - screen[0]
-        for rail in ("CAM — Me", "CAM — Guest"):
-            rw = by_name[rail][0][2] - by_name[rail][0][0]
-            self.assertGreater(screen_w, rw * 2,
-                               "centre content should dominate the side rails")
+    def test_duo_screen_is_large_and_hosts_stay_in_centre_side_rails(self):
+        sc = next(s for s in self.scenes if s["name"] == "05 Screen · Duo")
+        by_name = {it["name"]: box(it) for it in cells(sc)}
+        self.assertEqual(by_name["SLOT · Content"], (392.0, 170.0, 1528.0, 809.0))
+        self.assertEqual(by_name["CAM · Chirag"], (48.0, 370.0, 368.0, 610.0))
+        self.assertEqual(by_name["CAM · Parth"], (1552.0, 370.0, 1872.0, 610.0))
+
+    def test_trio_screen_is_left_with_a_vertical_people_rail(self):
+        sc = next(s for s in self.scenes if s["name"] == "08 Screen · Trio")
+        by_name = {it["name"]: box(it) for it in cells(sc)}
+        self.assertEqual(by_name["SLOT · Content"], (48.0, 112.0, 1392.0, 868.0))
+        self.assertEqual(by_name["CAM · Chirag"], (1416.0, 112.0, 1872.0, 348.0))
+        self.assertEqual(by_name["CAM · Parth"], (1416.0, 372.0, 1872.0, 608.0))
+        self.assertEqual(by_name["CAM · Guest"], (1416.0, 632.0, 1872.0, 868.0))
+
+
+class TestBoundsCropping(unittest.TestCase):
+    """A scale-outer item that is not cropped to its bounds overflows them.
+
+    OBS bounding boxes position and scale a source; they do not clip it. With
+    "Crop to Bounding Box" off, scale-outer covers the box and draws the
+    overflow anyway, so a 16:9 camera in a wide cell bleeds over the top bar
+    and into the lower stack. Every geometry assertion still passes, because
+    the item's pos and bounds are exactly right -- only the pixels are wrong.
+    These tests exist because that shipped and was caught by eye, on air."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.col = collection()
+
+    def test_every_filled_item_is_cropped_to_its_bounds(self):
+        for scene in scenes(self.col):
+            for it in scene["settings"]["items"]:
+                if it["bounds_type"] == 3:
+                    with self.subTest(scene=scene["name"], item=it["name"]):
+                        self.assertTrue(
+                            it["bounds_crop"],
+                            f"{it['name']} fills its box but is not cropped to "
+                            "it, so it will overflow into neighbouring cells")
+
+    def test_fitted_items_are_not_cropped(self):
+        """scale-inner already fits inside the box; cropping it would be a
+        no-op that quietly hides a future aspect-ratio mistake."""
+        for scene in scenes(self.col):
+            for it in scene["settings"]["items"]:
+                if it["bounds_type"] == 2:
+                    with self.subTest(scene=scene["name"], item=it["name"]):
+                        self.assertFalse(it["bounds_crop"])
+
+    def test_a_wide_cell_would_overflow_a_16_9_feed_uncropped(self):
+        """Grounds the rule in arithmetic rather than a magic boolean: show
+        that the overflow is real and large for the cells actually used."""
+        for scene in scenes(self.col):
+            for it in cells(scene):
+                if it["bounds_type"] != 3:
+                    continue      # scale-inner letterboxes; it cannot overflow
+                w, h = it["bounds"]["x"], it["bounds"]["y"]
+                cam_w, cam_h = 1280, 720          # a common webcam mode
+                scale = max(w / cam_w, h / cam_h)  # scale-outer covers the box
+                drawn_h, drawn_w = cam_h * scale, cam_w * scale
+                overflow = max(drawn_h - h, drawn_w - w)
+                if overflow > 1:
+                    with self.subTest(scene=scene["name"], item=it["name"]):
+                        self.assertTrue(
+                            it["bounds_crop"],
+                            f"{it['name']} would draw {overflow:.0f}px outside "
+                            f"its {w:.0f}x{h:.0f} box without cropping")
 
 
 class TestSchema(unittest.TestCase):
@@ -226,15 +273,17 @@ class TestSchema(unittest.TestCase):
         """Track 1 = my mic, 2 = the guest's voice, 3 = audio from whatever the
         guest shares, 6 = a safety mix of all of them. Separate tracks are what
         make the recording fixable in post."""
-        self.assertEqual(self.by_name["MIC — Me"]["mixers"], 0b100001)           # 33
-        self.assertEqual(self.by_name["CAM — Guest"]["mixers"], 0b100010)        # 34
-        self.assertEqual(self.by_name["SCREEN — Guest Share"]["mixers"], 0b100100)  # 36
+        self.assertEqual(self.by_name["MIC · Chirag"]["mixers"], 0b100001)           # 33
+        self.assertEqual(self.by_name["CAM · Guest"]["mixers"], 0b100010)        # 34
+        self.assertEqual(self.by_name["SCREEN · Guest Share"]["mixers"], 0b100100)  # 36
+        self.assertEqual(self.by_name["CAM · Parth"]["mixers"], 0b101000)
+        self.assertEqual(self.by_name["SCREEN · Parth Share"]["mixers"], 0b110000)
 
     def test_no_two_sources_claim_the_same_isolated_track(self):
         """The point of isolated tracks is that each holds exactly one voice.
         Two sources sharing track 2 would mix them together permanently, which
         no amount of editing can undo."""
-        for track in (0, 1, 2):                      # tracks 1, 2, 3
+        for track in range(5):
             claimants = [s["name"] for s in self.col["sources"]
                          if s["mixers"] & (1 << track)]
             self.assertLessEqual(len(claimants), 1,
@@ -295,10 +344,10 @@ class TestSchema(unittest.TestCase):
         and lower stack, or the branding flickers on switch."""
         for sc in self.scenes:
             names = {it["name"] for it in sc["settings"]["items"]}
-            if names & {"CARD — Title", "CARD — Outro"}:
+            if names & {"CARD · Title", "CARD · Outro", "CARD · Break"}:
                 continue
-            self.assertIn("UI — Top Bar", names, sc["name"])
-            self.assertIn("UI — Lower Stack", names, sc["name"])
+            self.assertIn("UI · Top Bar", names, sc["name"])
+            self.assertIn("UI · Lower Stack", names, sc["name"])
 
     def test_serializes_to_json(self):
         with tempfile.TemporaryDirectory() as d:
@@ -335,11 +384,12 @@ class TestAssetWiring(unittest.TestCase):
         """obs-browser renders offscreen at a fixed pixel size. If that does not
         match the box it is composited into, the asset is rescaled and blurs."""
         expect = {
-            "BG — Starfield": (CANVAS_W, CANVAS_H),
-            "UI — Top Bar": (CANVAS_W, TOPBAR_H),
-            "UI — Lower Stack": (CANVAS_W, LOWER_H),
-            "CARD — Title": (CANVAS_W, CANVAS_H),
-            "CARD — Outro": (CANVAS_W, CANVAS_H),
+            "BG · Starfield": (CANVAS_W, CANVAS_H),
+            "UI · Top Bar": (CANVAS_W, TOPBAR_H),
+            "UI · Lower Stack": (CANVAS_W, LOWER_H),
+            "CARD · Title": (CANVAS_W, CANVAS_H),
+            "CARD · Outro": (CANVAS_W, CANVAS_H),
+            "CARD · Break": (CANVAS_W, CANVAS_H),
         }
         for name, (w, h) in expect.items():
             s = self.browsers[name]["settings"]
@@ -362,34 +412,40 @@ class TestAssetWiring(unittest.TestCase):
     def test_headline_slot_is_not_the_show_name(self):
         """Regression: lower_stack's `title` is the headline row. Feeding it the
         brand duplicates the wordmark already in the badge and the top bar."""
-        title = self.params("UI — Lower Stack")["title"][0]
-        show = self.params("UI — Top Bar")["show"][0]
+        title = self.params("UI · Lower Stack")["title"][0]
+        show = self.params("UI · Top Bar")["show"][0]
         self.assertNotEqual(title.strip().upper(), show.strip().upper())
 
     def test_lower_stack_params(self):
-        p = self.params("UI — Lower Stack")
-        for key in ("title", "hosts", "sponsors", "presentedBy"):
+        p = self.params("UI · Lower Stack")
+        for key in ("title", "hosts", "episode", "chiragSite", "parthSite"):
             self.assertIn(key, p, f"lower stack missing {key}")
 
-    def test_sponsors_are_the_four_named(self):
-        want = ["lordpatil.com", "Dev Drink", "Lord Socks", "House of Lords"]
-        for name in ("UI — Lower Stack", "CARD — Outro"):
-            got = self.params(name)["sponsors"][0].split("|")
-            self.assertEqual(got, want, name)
+    def test_host_websites_are_wired_to_all_identity_panels(self):
+        for name in ("UI · Lower Stack", "CARD · Title", "CARD · Outro", "CARD · Break"):
+            self.assertEqual(self.params(name)["chiragSite"], ["lordpatil.com"])
+            self.assertEqual(self.params(name)["parthSite"], ["parthshastri.co.in"])
 
-    def test_sponsor_list_fits_the_four_slots(self):
-        """Both assets slice to 4; a fifth sponsor would silently vanish."""
-        for name in ("UI — Lower Stack", "CARD — Outro"):
-            self.assertLessEqual(len(self.params(name)["sponsors"][0].split("|")), 4)
+    def test_brands_use_the_supplied_bev_artwork(self):
+        with open(os.path.join(bs.ASSETS, "brand.js")) as f:
+            sponsor_component = f.read()
+        self.assertIn('src="bev-logo.svg"', sponsor_component)
+        self.assertIn("Lord Socks", sponsor_component)
+        self.assertIn("House of Lords", sponsor_component)
+        self.assertNotIn("Dev Drink", sponsor_component)
+        for asset in ("lower_stack.html", "title_card.html", "outro_card.html"):
+            with open(os.path.join(bs.ASSETS, asset)) as f:
+                html = f.read()
+            self.assertIn("data-sponsors", html)
 
     def test_params_are_url_encoded(self):
         """Pipes and spaces must survive the query string intact."""
-        raw = self.browsers["UI — Lower Stack"]["settings"]["url"]
+        raw = self.browsers["UI · Lower Stack"]["settings"]["url"]
         self.assertNotIn("|", raw, "unencoded pipe in URL")
         self.assertNotIn(" ", raw, "unencoded space in URL")
 
     def test_cards_get_show_name(self):
-        for name in ("CARD — Title", "CARD — Outro"):
+        for name in ("CARD · Title", "CARD · Outro"):
             self.assertIn("show", self.params(name), name)
 
     def test_param_names_match_what_the_html_reads(self):
@@ -397,14 +453,15 @@ class TestAssetWiring(unittest.TestCase):
         keys they actually consume. Catches typo'd params, which fail silently
         because readText just falls back to its default."""
         import re
-        for src, asset in [("UI — Top Bar", "topbar.html"),
-                           ("UI — Lower Stack", "lower_stack.html"),
-                           ("CARD — Title", "title_card.html"),
-                           ("CARD — Outro", "outro_card.html")]:
+        for src, asset in [("UI · Top Bar", "topbar.html"),
+                           ("UI · Lower Stack", "lower_stack.html"),
+                           ("CARD · Title", "title_card.html"),
+                           ("CARD · Outro", "outro_card.html")]:
             with open(os.path.join(bs.ASSETS, asset)) as f:
                 html = f.read()
             known = set(re.findall(r'readText\(\s*"([^"]+)"', html))
             known |= set(re.findall(r'params\.get\(\s*"([^"]+)"', html))
+            known |= set(re.findall(r'data-copy="([^"]+)"', html))
             for key in self.params(src):
                 self.assertIn(key, known,
                               f'{asset} never reads "{key}" - it will be ignored')
@@ -438,16 +495,16 @@ class TestRemoteGuest(unittest.TestCase):
         feed, visibly, even when it is covered."""
         for sc in self.scenes:
             live = {it["name"] for it in sc["settings"]["items"] if it["visible"]}
-            self.assertIn("CAM — Guest", live,
+            self.assertIn("CAM · Guest", live,
                           f'{sc["name"]}: guest audio is not active here')
 
     def test_carriers_sit_beneath_the_opaque_backing(self):
         """A carrier must be invisible to the viewer. Items are stored
-        bottom-to-top, so it has to come before BG — Void in the list; if it
+        bottom-to-top, so it has to come before BG · Void in the list; if it
         ever floats above, a full-frame guest camera covers the whole scene."""
         for sc in self.scenes:
             names = [it["name"] for it in sc["settings"]["items"]]
-            void = names.index("BG — Void")
+            void = names.index("BG · Void")
             for i, it in enumerate(sc["settings"]["items"]):
                 if it["private_settings"].get("frontier_role") == CARRIER:
                     self.assertLess(i, void,
@@ -462,15 +519,15 @@ class TestRemoteGuest(unittest.TestCase):
         carry an explicit push."""
         sent = parse_qs(urlparse(self.link).query)
         self.assertEqual(sent["push"][0], GUEST_ID)
-        self.assertEqual(self.query("CAM — Guest")["view"][0], GUEST_ID)
-        self.assertEqual(sent["room"][0], self.query("CAM — Guest")["room"][0])
+        self.assertEqual(self.query("CAM · Guest")["view"][0], GUEST_ID)
+        self.assertEqual(sent["room"][0], self.query("CAM · Guest")["room"][0])
 
     def test_share_is_addressed_as_a_separate_stream(self):
         """The whole reason for moving off window-capture: the guest's screen
         must be its own stream, not the same window as their face."""
-        self.assertEqual(self.query("SCREEN — Guest Share")["view"][0],
+        self.assertEqual(self.query("SCREEN · Guest Share")["view"][0],
                          f"{GUEST_ID}:s")
-        self.assertIn(f"view={GUEST_ID}:s", self.url("SCREEN — Guest Share"),
+        self.assertIn(f"view={GUEST_ID}:s", self.url("SCREEN · Guest Share"),
                       "the ':' got percent-encoded; vdo.ninja will not match it")
 
     def test_solo_is_a_bare_flag(self):
@@ -544,17 +601,17 @@ class TestRemoteGuest(unittest.TestCase):
         slot = next(s for s in self.col["sources"] if s["name"] == SLOT_SCENE)
         items = slot["settings"]["items"]
         self.assertEqual({it["name"] for it in items},
-                         {"SCREEN — Share", "SCREEN — Guest Share"})
+                         {"SCREEN · Share", "SCREEN · Guest Share", "SCREEN · Parth Share"})
         self.assertEqual(sum(1 for it in items if it["visible"]), 1)
 
     def test_screen_scenes_go_through_the_slot(self):
         """Referencing a screen source directly would reintroduce the parallel
         scene-per-screen duplication the slot exists to avoid."""
-        for name in ("05 Screen — 3 Column", "06 Screen Full", "08 Screen + Guest"):
+        for name in ("05 Screen · Duo", "06 Screen Full", "08 Screen · Trio"):
             sc = next(s for s in self.scenes if s["name"] == name)
             names = {it["name"] for it in sc["settings"]["items"]}
             self.assertIn(SLOT_SCENE, names, name)
-            self.assertNotIn("SCREEN — Share", names, name)
+            self.assertNotIn("SCREEN · Share", names, name)
 
     def test_slot_is_not_reachable_by_hotkey(self):
         """It is a container, not a shot. If it entered scene_order it would
@@ -611,7 +668,7 @@ class TestIdentifierSanitising(unittest.TestCase):
         """The whole point. Feed build() and guest_link() an id that vdo.ninja
         would rewrite, and the two ends must still name the same stream."""
         dirty = "guest-1a2b3c4d"
-        col = build(ROOM, dirty, PASSWORD)
+        col = build(ROOM, dirty, PASSWORD, parth_id=PARTH_ID)
         pushed = parse_qs(urlparse(guest_link(ROOM, dirty, PASSWORD)).query,
                           keep_blank_values=True)["push"][0]
         views = {s["name"]: parse_qs(urlparse(s["settings"]["url"]).query,
@@ -619,12 +676,12 @@ class TestIdentifierSanitising(unittest.TestCase):
                  for s in col["sources"]
                  if "vdo.ninja" in s.get("settings", {}).get("url", "")}
         self.assertEqual(pushed, "guest_1a2b3c4d")
-        self.assertEqual(views["CAM — Guest"], pushed)
-        self.assertEqual(views["SCREEN — Guest Share"], pushed + ":s")
+        self.assertEqual(views["CAM · Guest"], pushed)
+        self.assertEqual(views["SCREEN · Guest Share"], pushed + ":s")
 
     def test_no_hyphen_survives_into_any_generated_link(self):
         """A hyphen anywhere in a stream id is the signature of the bug."""
-        col = build(ROOM, "guest-1a2b3c4d", PASSWORD)
+        col = build(ROOM, "guest-1a2b3c4d", PASSWORD, parth_id=PARTH_ID)
         for s in col["sources"]:
             url = s.get("settings", {}).get("url", "")
             if "vdo.ninja" not in url:
@@ -650,156 +707,350 @@ class TestIdentifierSanitising(unittest.TestCase):
             build("frontier-5e6f7a8b", GUEST_ID, PASSWORD)
 
 
-@unittest.skipUnless(os.path.isfile(CHROME), "headless Chrome not installed")
-class TestAssetRender(unittest.TestCase):
-    """Renders the real HTML at native size and asserts on pixels."""
-
-    tmp = None
-
+class TestDuoStudio(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tmp = tempfile.TemporaryDirectory()
-        try:
-            from PIL import Image  # noqa: F401
-        except ImportError:
-            raise unittest.SkipTest("Pillow not installed")
+        cls.col = collection()
+        cls.by_name = sources_by_name(cls.col)
 
-    @classmethod
-    def tearDownClass(cls):
-        if cls.tmp:
-            cls.tmp.cleanup()
+    def scene_feeds(self, name):
+        return {it["name"] for it in cells(self.by_name[name])}
 
-    @staticmethod
-    def digest(im):
-        """Compare renders by hash, not raw bytes: a failed assertEqual on
-        multi-megabyte image bytes buries the actual message."""
-        import hashlib
-        return hashlib.sha256(im.tobytes()).hexdigest()[:16]
+    def test_duo_is_default_in_both_program_and_preview(self):
+        self.assertEqual(self.col["current_scene"], "04 Duo")
+        self.assertEqual(self.col["current_program_scene"], "04 Duo")
+        self.assertEqual(self.scene_feeds("04 Duo"), {"CAM · Chirag", "CAM · Parth"})
 
-    def shot(self, asset, w, h, query="", budget=4000):
-        out = os.path.join(self.tmp.name, f"{asset}-{abs(hash((query, budget)))}.png")
-        url = "file://" + os.path.join(bs.ASSETS, asset) + query
-        subprocess.run(
-            [CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-             "--default-background-color=00000000", f"--virtual-time-budget={budget}",
-             f"--window-size={w},{h}", f"--screenshot={out}", url],
-            capture_output=True, timeout=90, check=False)
-        self.assertTrue(os.path.isfile(out), f"{asset} produced no render")
-        from PIL import Image
-        im = Image.open(out).convert("RGBA")
-        self.assertEqual(im.size, (w, h), f"{asset} rendered at the wrong size")
-        return im
+    def test_trio_has_three_distinct_participants(self):
+        self.assertEqual(self.scene_feeds("07 Trio · With Guest"),
+                         {"CAM · Chirag", "CAM · Parth", "CAM · Guest"})
 
-    def test_topbar_background_is_transparent(self):
-        """The top bar composites over live video. If it renders opaque it
-        blacks out the full width of the frame."""
-        im = self.shot("topbar.html", CANVAS_W, TOPBAR_H)
-        w, h = im.size
-        for p in [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)]:
-            self.assertLess(im.getpixel(p)[3], 40,
-                            f"top bar corner {p} is opaque")
+    def test_guest_is_centered_in_trio(self):
+        scene = self.by_name["07 Trio · With Guest"]
+        guest = next(it for it in cells(scene) if it["name"] == "CAM · Guest")
+        x0, _, x1, _ = box(guest)
+        self.assertAlmostEqual((x0 + x1) / 2, CANVAS_W / 2)
 
-    def test_topbar_renders_content(self):
-        im = self.shot("topbar.html", CANVAS_W, TOPBAR_H).convert("L")
-        bright = sum(1 for p in im.getdata() if p > 120)
-        self.assertGreater(bright, 2000, "top bar looks blank")
+    def test_screen_views_keep_the_hosts_and_add_optional_guest(self):
+        self.assertEqual(self.scene_feeds("05 Screen · Duo"),
+                         {"SLOT · Content", "CAM · Chirag", "CAM · Parth"})
+        self.assertEqual(self.scene_feeds("08 Screen · Trio"),
+                         {"SLOT · Content", "CAM · Chirag", "CAM · Parth", "CAM · Guest"})
 
-    def test_ticker_never_slides_under_the_presented_by_chip(self):
-        """Regression: the ticker window used to span the full 1920px, so
-        sponsor names scrolled beneath the chip and were hard-sliced by its
-        edge. The window is now inset and masked; sample several phases of the
-        30s loop and assert the gap left of the chip stays empty."""
-        from PIL import Image
-        CHIP_LEFT = CANVAS_W - 22 - 240          # 1658, chip's white border
-        gap_x = range(CHIP_LEFT - 28, CHIP_LEFT - 2)
-        for t in (0, 3, 8, 14, 21, 27):
-            im = self.shot("lower_stack.html", CANVAS_W, LOWER_H,
-                           f"?t={t}").convert("L")
-            worst = max(im.getpixel((x, y))
-                        for y in range(LOWER_H - 82, LOWER_H - 2)
-                        for x in gap_x)
-            self.assertLess(worst, 90,
-                            f"ticker text intrudes into the chip gap at t={t}s")
+    def test_all_audio_inputs_remain_active_in_every_scene(self):
+        expected = {"MIC · Chirag", "CAM · Parth", "SCREEN · Parth Share",
+                    "CAM · Guest", "SCREEN · Guest Share"}
+        for scene in scenes(self.col):
+            active = {it["name"] for it in scene["settings"]["items"] if it["visible"]}
+            self.assertTrue(expected <= active, scene["name"])
 
-    def test_ticker_loop_is_seamless(self):
-        """Two identical sets translated by exactly -50% means t=0 and t=30
-        must be pixel-identical. Adding a third set would break this.
+    def test_stream_ids_cannot_collapse_to_the_same_feed(self):
+        for parth in (GUEST_ID, "guest-id"):
+            guest = GUEST_ID if parth == GUEST_ID else "guest_id"
+            with self.assertRaises(ValueError):
+                build(ROOM, guest, PASSWORD, parth_id=parth)
 
-        Scoped to the ticker band: the badge orbit runs on its own 18s cycle,
-        so the full frame is legitimately different at t=30."""
-        band = (0, LOWER_H - 84, 1634, LOWER_H)      # the .ticker-window box
-        a = self.shot("lower_stack.html", CANVAS_W, LOWER_H, "?t=0").crop(band)
-        b = self.shot("lower_stack.html", CANVAS_W, LOWER_H, "?t=30").crop(band)
-        self.assertEqual(self.digest(a), self.digest(b),
-                         "ticker does not wrap seamlessly at the loop point")
+    def test_parth_id_is_required(self):
+        with self.assertRaises(ValueError):
+            build(ROOM, GUEST_ID, PASSWORD)
 
-    def test_lower_stack_shows_all_four_sponsors(self):
-        """Rendered, not grepped: the static sponsor row must fit all four
-        names without clipping. Checks each of the four columns has ink."""
-        im = self.shot("lower_stack.html", CANVAS_W, LOWER_H, "?t=5").convert("L")
-        # static sponsor row sits between the headline block and the ticker
-        for i in range(4):
-            x0, x1 = 300 + i * 420, 300 + i * 420 + 380
-            x1 = min(x1, CANVAS_W - 1)
-            ink = sum(1 for y in range(200, 250) for x in range(x0, x1)
-                      if im.getpixel((x, y)) > 120)
-            self.assertGreater(ink, 50, f"sponsor column {i} looks empty")
+    def test_parth_invitation_and_views_match(self):
+        link = guest_link(ROOM, PARTH_ID, PASSWORD)
+        pushed = parse_qs(urlparse(link).query)["push"][0]
+        cam = self.by_name["CAM · Parth"]["settings"]["url"]
+        share = self.by_name["SCREEN · Parth Share"]["settings"]["url"]
+        self.assertEqual(parse_qs(urlparse(cam).query)["view"][0], pushed)
+        self.assertEqual(parse_qs(urlparse(share).query)["view"][0], pushed + ":s")
 
-    def test_headline_param_reaches_the_render(self):
-        """A wrong param name fails silently via readText's fallback, so prove
-        the override actually changes pixels."""
-        a = self.shot("lower_stack.html", CANVAS_W, LOWER_H, "?t=5")
-        b = self.shot("lower_stack.html", CANVAS_W, LOWER_H,
-                      "?t=5&title=ZZZZ%20DIFFERENT%20HEADLINE%20ZZZZ")
-        self.assertNotEqual(self.digest(a), self.digest(b),
-                            "title param did not change the headline row")
+    def test_labels_stay_within_their_camera_cells(self):
+        for scene in scenes(self.col):
+            items = scene["settings"]["items"]
+            for item in items:
+                if not item["name"].startswith("UI · ") or " Label " not in item["name"]:
+                    continue
+                person = item["name"].split(" · ")[1].split(" Label ")[0]
+                feed = next(it for it in cells(scene) if it["name"] == f"CAM · {person}")
+                x0, y0, x1, y1 = box(item)
+                fx0, fy0, fx1, fy1 = box(feed)
+                self.assertTrue(fx0 <= x0 < x1 <= fx1)
+                self.assertTrue(fy0 <= y0 < y1 <= fy1)
+                self.assertGreater(items.index(item), items.index(feed))
 
-    def test_cards_animate_in_and_settle(self):
-        """Both cards start empty and fade in. t=0 near-black, t=4 full."""
-        for asset in ("title_card.html", "outro_card.html"):
-            early = self.shot(asset, CANVAS_W, CANVAS_H, "?t=0").convert("L")
-            late = self.shot(asset, CANVAS_W, CANVAS_H, "?t=4").convert("L")
-            e = sum(1 for p in early.getdata() if p > 60)
-            l = sum(1 for p in late.getdata() if p > 60)
-            self.assertGreater(l, 20000, f"{asset} never becomes visible")
-            self.assertGreater(l, e * 5, f"{asset} does not animate in")
+    def test_episode_and_guest_copy_reaches_sources(self):
+        col = build(ROOM, GUEST_ID, PASSWORD, parth_id=PARTH_ID,
+                    episode="12", title="Do machines understand?",
+                    guest_name="A Guest", guest_role="Researcher")
+        sources = sources_by_name(col)
+        lower = parse_qs(urlparse(sources["UI · Lower Stack"]["settings"]["url"]).query)
+        self.assertEqual(lower["title"], ["Do machines understand?"])
+        self.assertEqual(lower["episode"], ["12"])
+        labels = [s for name, s in sources.items() if name.startswith("UI · Guest Label")]
+        self.assertTrue(labels)
+        for source in labels:
+            query = parse_qs(urlparse(source["settings"]["url"]).query)
+            self.assertEqual(query["name"], ["A Guest"])
+            self.assertEqual(query["role"], ["Researcher"])
 
-    def test_animations_run_when_no_freeze_param_is_given(self):
-        """Regression, and the one that matters most in production: the debug
-        freeze branch used `Number(params.get("t"))`, but params.get returns
-        null when absent and Number(null) is 0 -- finite and >= 0 -- so every
-        asset froze at time zero in OBS. The intro rendered blank and the
-        sponsor ticker never moved.
+    def test_profile_enables_all_six_tracks(self):
+        with open(os.path.join(os.path.dirname(bs.__file__), "apply_profile.sh")) as f:
+            profile = f.read()
+        self.assertIn("TRACKS=63", profile)
 
-        Every earlier render test passed an explicit t=, so none caught it.
-        This one must never pass a t param."""
-        for asset in ("title_card.html", "outro_card.html"):
-            live = self.shot(asset, CANVAS_W, CANVAS_H).convert("L")
-            frozen = self.shot(asset, CANVAS_W, CANVAS_H, "?t=0").convert("L")
-            self.assertNotEqual(
-                self.digest(live), self.digest(frozen),
-                f"{asset} with no t param renders identically to t=0 - "
-                "animations are frozen")
-            bright = sum(1 for p in live.getdata() if p > 60)
-            self.assertGreater(bright, 20000,
-                               f"{asset} renders blank without a freeze param")
+    def test_local_brand_fonts_and_licenses_exist(self):
+        for family in ("Anybody", "DelaGothicOne", "FragmentMono"):
+            font = os.path.join(bs.ASSETS, "fonts", family + ".ttf")
+            self.assertGreater(os.path.getsize(font), 1000)
+            self.assertTrue(os.path.isfile(os.path.join(bs.ASSETS, "fonts", family + "-OFL.txt")))
 
-    def test_ticker_moves_when_no_freeze_param_is_given(self):
-        """Same root cause, seen from the sponsor row: sample the ticker band
-        at two different virtual-time budgets and require the pixels to differ."""
-        band = (0, LOWER_H - 84, 1634, LOWER_H)
-        a = self.shot("lower_stack.html", CANVAS_W, LOWER_H, budget=1500).crop(band)
-        b = self.shot("lower_stack.html", CANVAS_W, LOWER_H, budget=6000).crop(band)
-        self.assertNotEqual(self.digest(a), self.digest(b),
-                            "sponsor ticker is not moving without a t param")
+    def test_default_font_stays_in_shared_config(self):
+        with open(os.path.join(bs.ASSETS, "font-config.js")) as f:
+            config = f.read()
+        self.assertIn('googleFonts: {', config)
+        for role in ("brand", "display", "mono"):
+            self.assertIn(f'{role}: ""', config)
+        self.assertIn('brand: \'"Anybody", sans-serif\'', config)
+        for asset in ("topbar.html", "lower_stack.html", "title_card.html",
+                      "outro_card.html", "participant_label.html",
+                      "starfield_bg.html"):
+            with open(os.path.join(bs.ASSETS, asset)) as f:
+                html = f.read()
+            self.assertLess(html.index('src="font-config.js"'),
+                            html.index('src="brand.js"'), asset)
 
-    def test_cards_are_fully_opaque(self):
-        """Cards are full-frame takeovers; any transparency would leak the
-        scene behind them."""
-        for asset in ("title_card.html", "outro_card.html", "starfield_bg.html"):
-            im = self.shot(asset, CANVAS_W, CANVAS_H, "?t=4")
-            lo, _ = im.getchannel("A").getextrema()
-            self.assertEqual(lo, 255, f"{asset} is not fully opaque")
+
+class TestLocalHostSelection(unittest.TestCase):
+    def variants(self):
+        for host in ("chirag", "parth"):
+            yield host, build(ROOM, GUEST_ID, PASSWORD, parth_id=PARTH_ID,
+                              chirag_id="testchirag", local_host=host)
+
+    def test_collection_names_are_distinct_and_both_open_on_duo(self):
+        names = set()
+        for host, col in self.variants():
+            names.add(col["name"])
+            self.assertEqual(col["name"], f"WTF · {host.title()} local")
+            self.assertEqual(col["current_scene"], "04 Duo")
+            self.assertEqual(col["current_program_scene"], "04 Duo")
+        self.assertEqual(len(names), 2)
+
+    def test_only_selected_host_has_local_camera_and_microphone(self):
+        for host, col in self.variants():
+            local = host.title()
+            remote = "Parth" if host == "chirag" else "Chirag"
+            sources = sources_by_name(col)
+            self.assertEqual(sources[f"CAM · {local}"]["id"], "macos-avcapture")
+            self.assertEqual(sources[f"MIC · {local}"]["id"], "coreaudio_input_capture")
+            self.assertEqual(sources[f"CAM · {remote}"]["id"], "browser_source")
+            self.assertNotIn(f"MIC · {remote}", sources)
+            self.assertEqual(sum(s["id"] == "coreaudio_input_capture" for s in col["sources"]), 1)
+
+    def test_voice_tracks_stay_attached_to_people(self):
+        for host, col in self.variants():
+            sources = sources_by_name(col)
+            for person, bit in (("chirag", bs.TRACK_1), ("parth", bs.TRACK_4)):
+                source = f"MIC · {person.title()}" if host == person else f"CAM · {person.title()}"
+                self.assertEqual(sources[source]["mixers"], bit | bs.TRACK_6)
+            for index in range(5):
+                self.assertEqual(sum(bool(s["mixers"] & (1 << index)) for s in col["sources"]), 1)
+
+    def test_remote_host_uses_the_correct_stream_and_share(self):
+        for host, col in self.variants():
+            person, sid = ("Parth", PARTH_ID) if host == "chirag" else ("Chirag", "testchirag")
+            sources = sources_by_name(col)
+            for name, stream in ((f"CAM · {person}", sid), (f"SCREEN · {person} Share", sid + ":s")):
+                source = sources[name]
+                query = parse_qs(urlparse(source["settings"]["url"]).query)
+                self.assertEqual(query["view"], [stream])
+                self.assertEqual(query["password"], [PASSWORD])
+                self.assertFalse(source["settings"]["restart_when_active"])
+                self.assertFalse(source["settings"]["shutdown"])
+            self.assertEqual(sources[f"SCREEN · {person} Share"]["mixers"], bs.TRACK_5 | bs.TRACK_6)
+
+    def test_active_audio_carriers_follow_the_selected_local_host(self):
+        for host, col in self.variants():
+            local = host.title()
+            remote = "Parth" if host == "chirag" else "Chirag"
+            expected = {f"MIC · {local}", f"CAM · {remote}", f"SCREEN · {remote} Share",
+                        "CAM · Guest", "SCREEN · Guest Share"}
+            for scene in scenes(col):
+                items = scene["settings"]["items"]
+                backing = next(i for i, item in enumerate(items) if item["name"] == "BG · Void")
+                carriers = [item for item in items if item["private_settings"].get("frontier_role") == CARRIER]
+                self.assertEqual({item["name"] for item in carriers}, expected)
+                for item in carriers:
+                    self.assertTrue(item["visible"])
+                    self.assertLess(items.index(item), backing)
+
+    def test_content_slot_defaults_to_local_screen_and_offers_remote_host_share(self):
+        for host, col in self.variants():
+            remote = "Parth" if host == "chirag" else "Chirag"
+            slot = sources_by_name(col)[SLOT_SCENE]["settings"]["items"]
+            self.assertEqual({item["name"] for item in slot},
+                             {"SCREEN · Share", f"SCREEN · {remote} Share", "SCREEN · Guest Share"})
+            self.assertEqual([item["name"] for item in slot if item["visible"]], ["SCREEN · Share"])
+
+    def test_host_change_preserves_all_scene_geometry_and_identity_labels(self):
+        chirag, parth = [col for _, col in self.variants()]
+        a, b = sources_by_name(chirag), sources_by_name(parth)
+        self.assertEqual(chirag["scene_order"], parth["scene_order"])
+        for name in [entry["name"] for entry in chirag["scene_order"]]:
+            def visible_geometry(scene):
+                return [(item["name"], box(item)) for item in scene["settings"]["items"]
+                        if item["private_settings"].get("frontier_role") != CARRIER]
+            self.assertEqual(visible_geometry(a[name]), visible_geometry(b[name]))
+        for name, source in a.items():
+            if " Label " in name:
+                self.assertEqual(source["settings"]["url"], b[name]["settings"]["url"])
+
+    def test_parth_local_does_not_require_a_parth_stream_id(self):
+        col = build(ROOM, GUEST_ID, PASSWORD, chirag_id="testchirag", local_host="parth")
+        self.assertEqual(col["name"], "WTF · Parth local")
+
+    def test_invalid_local_host_is_rejected(self):
+        with self.assertRaises(ValueError):
+            build(ROOM, GUEST_ID, PASSWORD, parth_id=PARTH_ID, local_host="guest")
+
+    def test_remote_chirag_id_is_required_for_parth_local(self):
+        with self.assertRaises(ValueError):
+            build(ROOM, GUEST_ID, PASSWORD, parth_id=PARTH_ID, local_host="parth")
+
+    def test_normalized_ids_must_be_distinct(self):
+        with self.assertRaises(ValueError):
+            build(ROOM, "test_guest", PASSWORD, chirag_id="test-guest", local_host="parth")
+
+    def cli(self, *args, **changes):
+        env = dict(os.environ, VDO_ROOM=ROOM, VDO_GUEST_ID=GUEST_ID,
+                   VDO_PARTH_ID=PARTH_ID, VDO_CHIRAG_ID="testchirag", VDO_PASSWORD=PASSWORD)
+        env.update(changes)
+        return subprocess.run([sys.executable, bs.__file__, *args],
+                              env=env, capture_output=True, text=True)
+
+    def test_cli_builds_both_importable_collections(self):
+        with tempfile.TemporaryDirectory() as d:
+            result = self.cli("--both-local-hosts", "-o", os.path.join(d, "podcast_scenes.json"))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            for host in ("chirag", "parth"):
+                with open(os.path.join(d, f"podcast_scenes_{host}_local.json")) as f:
+                    col = json.load(f)
+                self.assertEqual(col["name"], f"WTF · {host.title()} local")
+
+    def test_cli_builds_parth_local_without_parth_id(self):
+        with tempfile.TemporaryDirectory() as d:
+            target = os.path.join(d, "parth.json")
+            result = self.cli("--local-host", "parth", "-o", target, VDO_PARTH_ID="")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            with open(target) as f:
+                self.assertEqual(json.load(f)["name"], "WTF · Parth local")
+
+    def test_dual_generation_validates_before_writing_any_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            result = self.cli("--both-local-hosts", "-o", os.path.join(d, "podcast_scenes.json"),
+                              VDO_CHIRAG_ID=GUEST_ID)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(os.listdir(d), [])
+
+    def test_chirag_link_does_not_require_unrelated_ids(self):
+        result = self.cli("--chirag-link", VDO_GUEST_ID="", VDO_PARTH_ID="")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(parse_qs(urlparse(result.stdout.strip()).query)["push"], ["testchirag"])
+
+    def test_preview_reflects_local_host_without_remote_connections(self):
+        from preview_studio import preview_data
+        for host in ("chirag", "parth"):
+            data = preview_data(host)
+            duo = next(scene for scene in data if scene["name"] == "04 Duo")
+            cameras = [item for item in duo["items"] if item["name"].startswith("CAM · ")]
+            local = [item["name"] for item in cameras if item["capture"] == "Local camera"]
+            self.assertEqual(local, [f"CAM · {host.title()}"])
+            self.assertNotIn("vdo.ninja", json.dumps(data))
+
+
+class TestRecordingVerification(unittest.TestCase):
+    """Exercise the real shell verifier with deterministic media-tool fixtures."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.bin = os.path.join(self.tmp.name, "bin")
+        os.mkdir(self.bin)
+        fixtures = {
+            "ffprobe": 'import os\nprint("\\n".join(str(i) for i in range(int(os.environ.get("WTF_TEST_TRACKS", "6")))))\n',
+            "ffmpeg": 'import os, sys\nindex = sys.argv[sys.argv.index("-map") + 1].split(":")[-1]\nsilent = index in os.environ.get("WTF_TEST_SILENT", "1,2,4").split(",")\nprint("mean_volume: -91 dB" if silent else "mean_volume: -20 dB", file=sys.stderr)\nprint("max_volume: -inf dB" if silent else "max_volume: -8 dB", file=sys.stderr)\n',
+        }
+        for name, body in fixtures.items():
+            filename = os.path.join(self.bin, name)
+            with open(filename, "w") as f:
+                f.write("#!" + sys.executable + "\n" + body)
+            os.chmod(filename, 0o700)
+        self.recording = os.path.join(self.tmp.name, "test.mkv")
+        with open(self.recording, "w"):
+            pass
+
+    def verify(self, guest=False, silent="1,2,4", tracks="6"):
+        env = dict(os.environ, PATH=self.bin + os.pathsep + os.environ["PATH"],
+                   WTF_TEST_SILENT=silent, WTF_TEST_TRACKS=tracks)
+        script = os.path.join(os.path.dirname(bs.__file__), "verify_recording.sh")
+        return subprocess.run(["bash", script] + (["--guest"] if guest else []) +
+                              [self.recording], env=env, capture_output=True, text=True)
+
+    def test_duo_allows_idle_guest_and_share_tracks(self):
+        result = self.verify()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("idle", result.stdout)
+
+    def test_duo_requires_parth(self):
+        self.assertEqual(self.verify(silent="1,2,3,4").returncode, 1)
+
+    def test_duo_requires_chirag(self):
+        self.assertEqual(self.verify(silent="0,1,2,4").returncode, 1)
+
+    def test_guest_mode_requires_guest_voice(self):
+        self.assertEqual(self.verify(guest=True).returncode, 1)
+
+    def test_guest_mode_allows_idle_screen_audio(self):
+        result = self.verify(guest=True, silent="2,4")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_safety_mix_is_required(self):
+        self.assertEqual(self.verify(silent="1,2,4,5").returncode, 1)
+
+    def test_old_four_track_files_are_rejected(self):
+        result = self.verify(tracks="4")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("expected six tracks", result.stdout)
+
+
+class TestPreviewAndCLI(unittest.TestCase):
+    def test_preview_does_not_include_remote_urls_or_credentials(self):
+        from preview_studio import preview_data
+        data = preview_data()
+        text = json.dumps(data)
+        self.assertNotIn("vdo.ninja", text)
+        self.assertNotIn("password", text)
+        self.assertEqual(len(data), 12)
+        self.assertTrue(all("carrier" not in str(scene) for scene in data))
+
+    def test_cli_writes_duo_collection_with_episode_overrides(self):
+        with tempfile.TemporaryDirectory() as d:
+            output = os.path.join(d, "scenes.json")
+            env = dict(os.environ, VDO_ROOM=ROOM, VDO_GUEST_ID=GUEST_ID,
+                       VDO_PARTH_ID=PARTH_ID, VDO_PASSWORD=PASSWORD)
+            result = subprocess.run([sys.executable, bs.__file__, "-o", output,
+                                     "--episode", "42", "--title", "A new horizon"],
+                                    env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            with open(output) as f:
+                col = json.load(f)
+            self.assertEqual(col["current_program_scene"], "04 Duo")
+            lower = sources_by_name(col)["UI · Lower Stack"]
+            self.assertEqual(parse_qs(urlparse(lower["settings"]["url"]).query)["episode"], ["42"])
+
+    def test_cli_cohost_link_uses_its_own_id(self):
+        env = dict(os.environ, VDO_ROOM=ROOM, VDO_GUEST_ID=GUEST_ID,
+                   VDO_PARTH_ID=PARTH_ID, VDO_PASSWORD=PASSWORD)
+        result = subprocess.run([sys.executable, bs.__file__, "--parth-link"],
+                                env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(parse_qs(urlparse(result.stdout.strip()).query)["push"], [PARTH_ID])
 
 
 if __name__ == "__main__":
