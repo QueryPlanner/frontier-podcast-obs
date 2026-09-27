@@ -11,7 +11,7 @@ headlines and readable body copy, and Fragment Mono handles metadata.
 All three fonts are bundled locally with their licenses. This current set is
 the default typography variant.
 
-Host identities show **lordpatil.com** for Chirag and **parthshastri.co.in** for Parth.
+Host identities show **lordpatil.com** for Chirag and **parth-shastri.com** for Parth.
 **Lord Socks**, **House of Lords** and the supplied **Bev. SVG logo** rotate continuously through a compact sponsor strip at the bottom, separate from either host.
 The Bev. artwork is preserved without redrawing or substituting typed text.
 

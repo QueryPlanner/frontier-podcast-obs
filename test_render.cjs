@@ -54,7 +54,7 @@ test('font config keeps the local default and accepts a Google Font for every ro
   assert.match(await trial.locator('link[data-google-font-role="mono"]').getAttribute('href'),/fonts\.googleapis\.com/);
   await trial.close();
 });
-for(const [file,w,h] of [['topbar.html',1920,96],['lower_stack.html',1920,196],['title_card.html',1920,1080],['outro_card.html',1920,1080],['starfield_bg.html',1920,1080],['participant_label.html',488,64]]){
+for(const [file,w,h] of [['topbar.html',1920,96],['lower_stack.html',1920,196],['title_card.html',1920,1080],['video_intro_card.html',1920,1080],['outro_card.html',1920,1080],['post_intro_card.html',1920,1080],['post_outro_card.html',1920,1080],['starfield_bg.html',1920,1080],['participant_label.html',488,64]]){
   test(file+' fits its native canvas offline',async()=>{
     await open(file,w,h);
     const layout=await page.evaluate(()=>({width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight,images:[...document.images].every(i=>i.complete&&i.naturalWidth>0),text:document.body.innerText,fonts:[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family)}));
@@ -72,7 +72,7 @@ test('transparent overlays leave the canvas corners clear',async()=>{
   }
 });
 test('full-frame cards and background remain opaque',async()=>{
-  for(const file of ['title_card.html','outro_card.html','starfield_bg.html']){
+  for(const file of ['title_card.html','video_intro_card.html','outro_card.html','post_intro_card.html','post_outro_card.html','starfield_bg.html']){
     await open(file);
     const im=PNG.sync.read(await page.screenshot({omitBackground:true}));
     for(let i=3;i<im.data.length;i+=4)assert.equal(im.data[i],255);
@@ -81,7 +81,7 @@ test('full-frame cards and background remain opaque',async()=>{
 test('sponsors loop in a bottom strip separate from host identities',async()=>{
   for(const file of ['lower_stack.html','title_card.html','outro_card.html']){
     await open(file,1920,file==='lower_stack.html'?196:1080);
-    for(const text of ['lordpatil.com','parthshastri.co.in','Lord Socks','House of Lords'])assert.ok((await page.locator('body').innerText()).includes(text));
+    for(const text of ['lordpatil.com','parth-shastri.com','Lord Socks','House of Lords'])assert.ok((await page.locator('body').innerText()).includes(text));
     assert.equal(await page.locator('img[alt="Bev."]').count(),1);
     assert.ok(!(await page.locator('body').innerText()).includes('Bev.'));
     const strip=page.locator('.sponsor-strip');
@@ -97,6 +97,43 @@ test('sponsors loop in a bottom strip separate from host identities',async()=>{
     assert.doesNotMatch(await strip.innerText(),/Chirag|Parth|lordpatil|parthshastri/);
     assert.equal(await page.locator('.host-identity .sponsor-strip, .host-identity .sponsor-bev').count(),0);
     assert.ok(await strip.evaluate(e=>e.getBoundingClientRect().bottom<=document.documentElement.clientHeight));
+  }
+});
+test('start and end cards use a YouTube-only subscription call to action',async()=>{
+  for(const file of ['video_intro_card.html','outro_card.html']){
+    await open(file);
+    const panel=page.locator('.cta-panel');
+    assert.equal(await panel.count(),1,file);
+    const copy=(await panel.innerText()).toLowerCase();
+    assert.ok(copy.includes('subscribe'),file+' is missing subscribe copy');
+    assert.doesNotMatch(copy,/spotify|apple podcasts/);
+    assert.equal(await panel.locator('.youtube-mark[aria-label="YouTube"] svg').count(),1,file+' is missing the YouTube mark');
+    const box=await panel.boundingBox();
+    assert.ok(box.x>=48&&box.y>=98&&box.x+box.width<=1872&&box.y+box.height<=880,file+' CTA leaves the safe area');
+    assert.ok(await panel.evaluate(e=>e.scrollWidth<=e.clientWidth&&e.scrollHeight<=e.clientHeight),file+' CTA overflows');
+  }
+});
+test('the upload intro keeps only the show name in the centre',async()=>{
+  await open('video_intro_card.html');
+  assert.equal((await page.locator('.video-intro-content').innerText()).trim(),'what’s the frontier');
+  assert.equal(await page.locator('.video-intro-content .video-intro-logo').count(),1);
+  assert.doesNotMatch(await page.locator('.page-edge').innerText(),/original podcast/i);
+});
+test('the upload intro is detached from the live standby scene',async()=>{
+  await open('title_card.html');
+  assert.equal(await page.locator('.cta-panel').count(),0);
+  assert.match(await page.locator('body').innerText(),/Starting soon/i);
+  const builder=fs.readFileSync(path.join(__dirname,'build_scenes.py'),'utf8');
+  assert.ok(!builder.includes('video_intro_card.html'));
+});
+test('post-production cards are static and detached from OBS',async()=>{
+  const builder=fs.readFileSync(path.join(__dirname,'build_scenes.py'),'utf8');
+  for(const file of ['post_intro_card.html','post_outro_card.html']){
+    await open(file);
+    assert.ok(!builder.includes(file));
+    assert.equal(await page.locator('canvas, script').count(),0,file+' contains runtime rendering');
+    assert.equal(await page.locator('.post-card').evaluate(e=>e.getAnimations({subtree:true}).length),0,file+' contains animation');
+    assert.equal(await page.locator('img').evaluateAll(images=>images.every(i=>i.complete&&i.naturalWidth>0)),true,file+' has a missing static asset');
   }
 });
 test('sponsor ticker moves continuously, freezes for debug and rests for reduced motion',async()=>{
@@ -131,7 +168,7 @@ test('guest name and role fit the narrowest camera rail',async()=>{
   await open('participant_label.html',216,64,'?name=Dr.%20Alexandra%20Chandrasekhar&role=AI%20Researcher');
   assert.ok(await page.locator('.name').evaluate(e=>e.scrollWidth<=e.clientWidth+1));
 });
-const LOGO_PAGES=[['title_card.html',1920,1080],['lower_stack.html',1920,196],['outro_card.html',1920,1080]];
+const LOGO_PAGES=[['title_card.html',1920,1080],['video_intro_card.html',1920,1080],['lower_stack.html',1920,196],['outro_card.html',1920,1080]];
 test('the orbital signal travels on every logo and debug time can freeze it',async()=>{
   for(const [file,w,h] of LOGO_PAGES){
     await open(file,w,h);
@@ -142,8 +179,8 @@ test('the orbital signal travels on every logo and debug time can freeze it',asy
     const after=await page.locator('.traveller').boundingBox();
     assert.notEqual(before.x,after.x,file+' signal does not move');
     await open(file,w,h,'?t=3');
-    assert.ok(await page.locator('svg').evaluate(e=>e.animationsPaused()),file);
-    assert.equal(await page.locator('svg').evaluate(e=>e.getCurrentTime()),3,file);
+    assert.ok(await page.locator('svg.wtf-mark').evaluate(e=>e.animationsPaused()),file);
+    assert.equal(await page.locator('svg.wtf-mark').evaluate(e=>e.getCurrentTime()),3,file);
   }
 });
 test('the signal keeps a legible on-screen size at every logo scale',async()=>{
@@ -163,7 +200,7 @@ test('reduced motion rests the signal on every logo',async()=>{
   await page.emulateMedia({reducedMotion:'reduce'});
   for(const [file,w,h] of LOGO_PAGES){
     await open(file,w,h);
-    assert.ok(await page.locator('svg').evaluate(e=>e.animationsPaused()),file);
+    assert.ok(await page.locator('svg.wtf-mark').evaluate(e=>e.animationsPaused()),file);
     assert.equal(await page.locator('.traveller').evaluate(e=>getComputedStyle(e).display),'none',file);
     assert.equal(await page.locator('.resting-signal').evaluate(e=>getComputedStyle(e).display),'block',file);
   }

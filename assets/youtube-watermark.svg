@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-labelledby="title desc">
+  <title id="title">WTF YouTube video watermark</title>
+  <desc id="desc">The WTF orbital mark on a dark rounded badge with transparent corners.</desc>
+  <defs>
+    <radialGradient id="badge" cx="70%" cy="26%" r="90%">
+      <stop offset="0" stop-color="#162752"/>
+      <stop offset=".55" stop-color="#0C101C"/>
+      <stop offset="1" stop-color="#07080D"/>
+    </radialGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="12"/>
+    </filter>
+  </defs>
+
+  <rect x="38" y="38" width="524" height="524" rx="136" fill="url(#badge)" fill-opacity=".96"/>
+  <rect x="42" y="42" width="516" height="516" rx="132" fill="none" stroke="#F2EBDD" stroke-opacity=".18" stroke-width="8"/>
+
+  <g transform="rotate(-10 300 300)" fill="none">
+    <path d="M78 304 C92 205 488 170 523 280 C563 405 123 441 78 326 C75 318 75 311 78 304Z"
+          stroke="#8B7CFF" stroke-opacity=".42" stroke-width="7"/>
+    <path d="M78 304 C92 238 207 198 326 189" stroke="#8B7CFF" stroke-width="13" stroke-linecap="round"/>
+  </g>
+
+  <circle cx="80" cy="342" r="28" fill="#FF9D62" fill-opacity=".18" filter="url(#glow)"/>
+  <circle cx="80" cy="342" r="13" fill="#FF9D62"/>
+
+  <path d="M163.68-174.24L182.40-65.52L194.88-174.24L253.44-174.24L221.28 0L147.60 0L131.28-97.20L112.32 0L41.76 0L9.60-174.24L68.16-174.24L80.40-66.96L99.60-174.24L163.68-174.24M466.80-174.24L466.80-123.84Q429.12-125.04 393.60-125.28L393.60 0L333.60 0L333.60-125.28Q297.84-125.04 260.64-123.84L260.64-174.24L466.80-174.24M661.20-174.24L661.20-129.36L530.64-129.36L530.64-104.16Q542.88-103.92 567.36-103.92Q609.60-103.92 653.28-105.36L653.28-58.32Q609.60-60 561.12-60Q540.96-60 530.64-59.76L530.64 0L474 0Q475.92-46.56 475.92-87.12Q475.92-127.68 474-174.24"
+        transform="translate(91 368) scale(.63)" fill="#F2EBDD"/>
+</svg>

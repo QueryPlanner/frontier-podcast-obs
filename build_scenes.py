@@ -332,7 +332,7 @@ def build(room, guest_id, password=None, *, parth_id=None, chirag_id=None,
     hosts = "Chirag & Parth"
     common = dict(show=show, episode=episode)
     identity = dict(hosts=hosts, chiragSite="lordpatil.com",
-                    parthSite="parthshastri.co.in")
+                    parthSite="parth-shastri.com")
     c.source("macos-avcapture", f"CAM · {local_name}")
     c.source("screen_capture", "SCREEN · Share")
     c.source("coreaudio_input_capture", f"MIC · {local_name}",
@@ -390,7 +390,7 @@ def build(room, guest_id, password=None, *, parth_id=None, chirag_id=None,
 
     people = {
         "Chirag": ("Chirag", "Co-host", "lordpatil.com"),
-        "Parth": ("Parth", "Co-host", "parthshastri.co.in"),
+        "Parth": ("Parth", "Co-host", "parth-shastri.com"),
         "Guest": (guest_name, guest_role, ""),
     }
 

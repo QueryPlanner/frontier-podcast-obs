@@ -424,7 +424,7 @@ class TestAssetWiring(unittest.TestCase):
     def test_host_websites_are_wired_to_all_identity_panels(self):
         for name in ("UI · Lower Stack", "CARD · Title", "CARD · Outro", "CARD · Break"):
             self.assertEqual(self.params(name)["chiragSite"], ["lordpatil.com"])
-            self.assertEqual(self.params(name)["parthSite"], ["parthshastri.co.in"])
+            self.assertEqual(self.params(name)["parthSite"], ["parth-shastri.com"])
 
     def test_brands_use_the_supplied_bev_artwork(self):
         with open(os.path.join(bs.ASSETS, "brand.js")) as f:
